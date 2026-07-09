@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import Link from "next/link"
 import { BudgetForm } from "@/components/budget-form"
 
 export default async function BudgetsPage() {
@@ -15,6 +14,11 @@ export default async function BudgetsPage() {
     .single()
 
   const partnershipId = partnership?.id || null
+
+  const { data: categories } = partnershipId ? await supabase
+    .from("categories")
+    .select("id, name, type")
+    .eq("partnership_id", partnershipId) : { data: [] }
 
   const budgets = await supabase
     .from("budgets")
@@ -32,7 +36,7 @@ export default async function BudgetsPage() {
   const budgetsWithSpending = await Promise.all(
     (budgets.data || []).map(async (budget) => {
       let spent = 0
-      let baseQuery = supabase
+      const baseQuery = supabase
         .from("transactions")
         .select("amount")
         .eq("category_id", budget.category_id)
@@ -57,11 +61,8 @@ export default async function BudgetsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Budgets</h1>
-          <p className="text-muted-foreground">Track spending limits</p>
-        </div>
-        <BudgetForm hasPartner={!!partnershipId} />
+        <p className="text-muted-foreground">Track spending limits</p>
+        <BudgetForm hasPartner={!!partnershipId} categories={categories || []} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -136,3 +137,4 @@ export default async function BudgetsPage() {
     </div>
   )
 }
+

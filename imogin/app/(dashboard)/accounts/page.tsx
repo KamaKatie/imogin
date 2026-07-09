@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server"
+﻿import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AccountForm } from "@/components/account-form"
+import Link from "next/link"
 
 export default async function AccountsPage() {
   const supabase = await createClient()
@@ -46,10 +47,7 @@ export default async function AccountsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground">Manage your personal and shared accounts</p>
-        </div>
+        <p className="text-muted-foreground">Manage your personal and shared accounts</p>
         <AccountForm hasPartner={!!partnershipId} />
       </div>
 
@@ -58,14 +56,14 @@ export default async function AccountsPage() {
           <h2 className="text-lg font-semibold mb-3">Shared Accounts</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {sharedAccounts.map((a) => (
-              <div key={a.id} className="rounded-xl border bg-card p-5" style={{ borderLeftColor: a.color || undefined, borderLeftWidth: 4 }}>
+              <Link key={a.id} href={"/accounts/" + a.id} className="rounded-xl border bg-card p-5" style={{ borderLeftColor: a.color || undefined, borderLeftWidth: 4 }}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-lg">{accountTypeIcons[a.type] || accountTypeIcons.other}</span>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full capitalize">{a.type.replace("_", " ")}</span>
                 </div>
                 <p className="font-medium">{a.name}</p>
                 <p className="text-2xl font-bold mt-1">¥{Math.abs(a.balance).toLocaleString()}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -80,14 +78,14 @@ export default async function AccountsPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {personalAccounts.map((a) => (
-              <div key={a.id} className="rounded-xl border bg-card p-5">
+              <Link key={a.id} href={"/accounts/" + a.id} className="rounded-xl border bg-card p-5 block">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-lg">{accountTypeIcons[a.type] || accountTypeIcons.other}</span>
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full capitalize">{a.type.replace("_", " ")}</span>
                 </div>
                 <p className="font-medium">{a.name}</p>
                 <p className="text-2xl font-bold mt-1">¥{Math.abs(a.balance).toLocaleString()}</p>
-              </div>
+              </Link>
             ))}
           </div>
         )}

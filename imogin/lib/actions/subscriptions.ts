@@ -85,7 +85,7 @@ export async function createSubscription(formData: FormData) {
     ])
   }
 
-  redirect("/subscriptions")
+  return { success: true }
 }
 
 export async function toggleSubscription(id: string, active: boolean) {
@@ -106,5 +106,6 @@ export async function deleteSubscription(id: string) {
     .eq("id", id)
 
   if (error) throw new Error(error.message)
-  redirect("/subscriptions")
+  return { success: true }
 }
+

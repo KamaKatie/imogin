@@ -63,7 +63,6 @@ export async function createAccount(formData: FormData) {
   const name = formData.get("name") as string
   const type = formData.get("type") as AccountType
   const balance = parseFloat(formData.get("balance") as string) || 0
-  const currency = (formData.get("currency") as string) || "JPY"
   const color = formData.get("color") as string
   const icon = formData.get("icon") as string
   const isShared = formData.get("is_shared") === "true"
@@ -87,7 +86,7 @@ export async function createAccount(formData: FormData) {
     if (error) throw new Error(error.message)
   }
 
-  redirect("/accounts")
+  return { success: true }
 }
 
 export async function updateAccount(id: string, formData: FormData) {
@@ -119,5 +118,6 @@ export async function deleteAccount(id: string) {
     .eq("id", id)
 
   if (error) throw new Error(error.message)
-  redirect("/accounts")
+  return { success: true }
 }
+

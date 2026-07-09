@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
@@ -98,7 +98,36 @@ export async function createGoal(formData: FormData) {
     if (error) throw new Error(error.message)
   }
 
-  redirect("/goals")
+  return { success: true }
+}
+
+export async function updateGoal(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const updates: Record<string, unknown> = {}
+  const name = formData.get("name") as string
+  const description = formData.get("description") as string
+  const targetAmount = formData.get("target_amount") as string
+  const targetDate = formData.get("target_date") as string
+  const icon = formData.get("icon") as string
+  const color = formData.get("color") as string
+
+  if (name) updates.name = name
+  if (description !== null) updates.description = description || null
+  if (targetAmount) updates.target_amount = parseFloat(targetAmount)
+  if (targetDate !== null) updates.target_date = targetDate || null
+  if (icon) updates.icon = icon
+  if (color) updates.color = color
+
+  const { error } = await supabase
+    .from("goals")
+    .update(updates)
+    .eq("id", id)
+
+  if (error) throw new Error(error.message)
+  return { success: true }
 }
 
 export async function addGoalContribution(goalId: string, formData: FormData) {
@@ -146,5 +175,6 @@ export async function deleteGoal(id: string) {
     .eq("id", id)
 
   if (error) throw new Error(error.message)
-  redirect("/goals")
+  return { success: true }
 }
+

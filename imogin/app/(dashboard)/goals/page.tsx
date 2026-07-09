@@ -1,7 +1,8 @@
-import { createClient } from "@/lib/supabase/server"
+﻿import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { GoalForm } from "@/components/goal-form"
+import { GoalEditDialog } from "@/components/goal-edit-dialog"
 
 export default async function GoalsPage() {
   const supabase = await createClient()
@@ -29,10 +30,7 @@ export default async function GoalsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Goals</h1>
-          <p className="text-muted-foreground">Track your savings goals</p>
-        </div>
+        <p className="text-muted-foreground">Track your savings goals</p>
         <GoalForm hasPartner={!!partnershipId} />
       </div>
 
@@ -67,6 +65,7 @@ export default async function GoalsPage() {
                   }`}>
                     {g.status}
                   </span>
+                  <GoalEditDialog goal={g} />
                 </div>
 
                 <div className="mb-2">

@@ -496,6 +496,7 @@ export type Database = {
           notes: string | null
           receipt_url: string | null
           split_method: string | null
+          transfer_group_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -513,6 +514,7 @@ export type Database = {
           notes?: string | null
           receipt_url?: string | null
           split_method?: string | null
+          transfer_group_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -530,6 +532,7 @@ export type Database = {
           notes?: string | null
           receipt_url?: string | null
           split_method?: string | null
+          transfer_group_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string

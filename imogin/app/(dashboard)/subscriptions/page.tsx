@@ -20,10 +20,7 @@ export default async function SubscriptionsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Subscriptions</h1>
-            <p className="text-muted-foreground">Track shared recurring expenses</p>
-          </div>
+          <p className="text-muted-foreground">Track shared recurring expenses</p>
         </div>
         <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
           <p>Create a partnership to track shared subscriptions</p>
@@ -60,10 +57,7 @@ export default async function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Subscriptions</h1>
-          <p className="text-muted-foreground">Track shared recurring expenses</p>
-        </div>
+        <p className="text-muted-foreground">Track shared recurring expenses</p>
         <div className="flex gap-2">
           <Link
             href="/subscriptions/calendar"

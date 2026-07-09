@@ -92,7 +92,7 @@ export async function joinPartnership(formData: FormData) {
     .update({ user2_id: user.id, share_code: null, share_code_expires_at: null })
     .eq("id", partnership.id)
 
-  redirect("/")
+  return { success: true }
 }
 
 export async function leavePartnership() {
@@ -122,5 +122,6 @@ export async function leavePartnership() {
       .eq("id", partnership.id)
   }
 
-  redirect("/")
+  return { success: true }
 }
+

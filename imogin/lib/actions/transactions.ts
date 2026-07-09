@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
@@ -130,7 +130,50 @@ export async function createTransaction(formData: FormData) {
     }
   }
 
-  redirect("/transactions")
+  return { success: true }
+}
+
+export async function updateTransaction(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const updates: Record<string, unknown> = {}
+  const description = formData.get("description") as string
+  const amount = formData.get("amount") as string
+  const categoryId = formData.get("category_id") as string
+  const date = formData.get("date") as string
+  const notes = formData.get("notes") as string
+
+  if (description) updates.description = description
+  if (amount) updates.amount = parseFloat(amount)
+  if (categoryId) updates.category_id = categoryId
+  if (date) updates.date = date
+  if (notes !== null) updates.notes = notes || null
+
+  const { error } = await supabase
+    .from("transactions")
+    .update(updates)
+    .eq("id", id)
+    .eq("user_id", user.id)
+
+  if (error) throw new Error(error.message)
+  return { success: true }
+}
+
+export async function deleteTransaction(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+
+  if (error) throw new Error(error.message)
+  return { success: true }
 }
 
 export async function settleSplit(splitId: string) {
@@ -142,3 +185,4 @@ export async function settleSplit(splitId: string) {
 
   if (error) throw new Error(error.message)
 }
+

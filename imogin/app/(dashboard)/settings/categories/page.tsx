@@ -27,10 +27,7 @@ export default async function CategoriesSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Categories</h1>
-        <p className="text-muted-foreground">Manage your spending categories</p>
-      </div>
+      <p className="text-muted-foreground">Manage your spending categories</p>
       <CategoryManager
         categories={categories as Array<{ id: string; name: string; icon: string | null; color: string | null; type: string }>}
         hasPartner={!!partnershipId}

@@ -98,10 +98,7 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">Spending insights for {new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" })}</p>
-      </div>
+      <p className="text-muted-foreground">Spending insights for {new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" })}</p>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border bg-card p-5">

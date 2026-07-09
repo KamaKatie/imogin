@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
+﻿import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
 
 export default async function GoalDetailPage({
@@ -28,8 +28,8 @@ export default async function GoalDetailPage({
   if (!goal) {
     return (
       <div className="space-y-6">
+        <BackLink />
         <h1 className="text-2xl font-bold">Goal not found</h1>
-        <Link href="/goals" className="text-primary hover:underline">Back to goals</Link>
       </div>
     )
   }
@@ -40,7 +40,7 @@ export default async function GoalDetailPage({
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <Link href="/goals" className="text-sm text-primary hover:underline">&larr; Back to goals</Link>
+        <BackLink />
       </div>
 
       <div className="rounded-xl border bg-card p-6">
@@ -63,8 +63,8 @@ export default async function GoalDetailPage({
 
         <div className="mb-4">
           <div className="flex justify-between text-lg mb-2">
-            <span className="font-bold">${goal.current_amount.toFixed(2)}</span>
-            <span className="text-muted-foreground">of ${goal.target_amount.toFixed(2)}</span>
+            <span className="font-bold">¥${goal.current_amount.toFixed(2)}</span>
+            <span className="text-muted-foreground">of ¥${goal.target_amount.toFixed(2)}</span>
           </div>
           <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
             <div

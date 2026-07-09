@@ -7,11 +7,18 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
 
-interface BudgetFormProps {
-  hasPartner: boolean
+interface CategoryOption {
+  id: string
+  name: string
+  type: string
 }
 
-export function BudgetForm({ hasPartner }: BudgetFormProps) {
+interface BudgetFormProps {
+  hasPartner: boolean
+  categories?: CategoryOption[]
+}
+
+export function BudgetForm({ hasPartner, categories = [] }: BudgetFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -50,6 +57,9 @@ export function BudgetForm({ hasPartner }: BudgetFormProps) {
             <label htmlFor="category_id" className="text-sm font-medium">Category</label>
             <select id="category_id" name="category_id" required className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
               <option value="">Select category</option>
+          {categories.filter(c => c.type === "expense").map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -85,3 +95,5 @@ export function BudgetForm({ hasPartner }: BudgetFormProps) {
     </Dialog>
   )
 }
+
+

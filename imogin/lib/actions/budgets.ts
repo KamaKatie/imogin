@@ -1,4 +1,4 @@
-"use server"
+﻿"use server"
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
@@ -58,7 +58,7 @@ export async function getBudgetWithSpending() {
   const budgetsWithSpending = await Promise.all(
     budgets.data.map(async (budget) => {
       let spent = 0
-      let baseQuery = supabase
+      const baseQuery = supabase
         .from("transactions")
         .select("amount")
         .eq("category_id", budget.category_id)
@@ -79,6 +79,33 @@ export async function getBudgetWithSpending() {
   )
 
   return budgetsWithSpending
+}
+
+export async function updateBudget(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const updates: Record<string, unknown> = {}
+  const categoryId = formData.get("category_id") as string
+  const amount = formData.get("amount") as string
+  const period = formData.get("period") as string
+  const startDate = formData.get("start_date") as string
+  const endDate = formData.get("end_date") as string
+
+  if (categoryId) updates.category_id = categoryId
+  if (amount) updates.amount = parseFloat(amount)
+  if (period) updates.period = period
+  if (startDate) updates.start_date = startDate
+  if (endDate !== null) updates.end_date = endDate || null
+
+  const { error } = await supabase
+    .from("budgets")
+    .update(updates)
+    .eq("id", id)
+
+  if (error) throw new Error(error.message)
+  return { success: true }
 }
 
 export async function createBudget(formData: FormData) {
@@ -115,7 +142,7 @@ export async function createBudget(formData: FormData) {
     if (error) throw new Error(error.message)
   }
 
-  redirect("/budgets")
+  return { success: true }
 }
 
 export async function deleteBudget(id: string) {
@@ -126,5 +153,6 @@ export async function deleteBudget(id: string) {
     .eq("id", id)
 
   if (error) throw new Error(error.message)
-  redirect("/budgets")
+  return { success: true }
 }
+

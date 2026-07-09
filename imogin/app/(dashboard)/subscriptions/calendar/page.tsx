@@ -29,10 +29,7 @@ export default async function SubscriptionCalendarPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Subscription Calendar</h1>
-          <p className="text-muted-foreground">View upcoming bills on a calendar</p>
-        </div>
+        <p className="text-muted-foreground">View upcoming bills on a calendar</p>
         <Link
           href="/subscriptions"
           className="inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent"

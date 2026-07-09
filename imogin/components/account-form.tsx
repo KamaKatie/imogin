@@ -1,6 +1,7 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
+import { ColorSwatch } from "@/components/color-swatch"
 import { createAccount } from "@/lib/actions/accounts"
 import { useRouter } from "next/navigation"
 import {
@@ -16,6 +17,7 @@ export function AccountForm({ hasPartner }: AccountFormProps) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState("")
+  const [selectedColor, setSelectedColor] = useState("#4F46E5")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -67,8 +69,9 @@ export function AccountForm({ hasPartner }: AccountFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="color" className="text-sm font-medium">Color</label>
-              <input id="color" name="color" type="color" defaultValue="#4F46E5" className="w-full h-10 rounded-lg border bg-background px-1 py-1" />
+              <label className="text-sm font-medium">Color</label>
+              <ColorSwatch value={selectedColor} onChange={setSelectedColor} />
+              <input type="hidden" name="color" value={selectedColor} />
             </div>
             <div className="space-y-2">
               <label htmlFor="icon" className="text-sm font-medium">Icon</label>
