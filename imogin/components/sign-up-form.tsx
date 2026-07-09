@@ -46,7 +46,7 @@ export function SignUpForm({
         password,
         options: {
           data: {
-            full_name: fullName,
+            name: fullName,
           },
           emailRedirectTo: `${window.location.origin}/protected`,
         },
@@ -71,11 +71,11 @@ export function SignUpForm({
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="full-name">Full Name</Label>
+                <Label htmlFor="full-name">Name</Label>
                 <Input
                   id="full-name"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder="Imoni K. G."
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}

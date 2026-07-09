@@ -1,10 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, ProfileUpdate } from "@/lib/supabase/types";
+import type { Tables, TablesUpdate } from "@/lib/supabase/types";
 import { redirect } from "next/navigation";
 
-export async function getProfile(): Promise<Profile | null> {
+export async function getProfile(): Promise<Tables<"profiles"> | null> {
   const supabase = await createClient();
 
   const {
@@ -21,7 +21,7 @@ export async function getProfile(): Promise<Profile | null> {
   return data;
 }
 
-export async function updateProfile(values: ProfileUpdate) {
+export async function updateProfile(values: TablesUpdate<"profiles">) {
   const supabase = await createClient();
 
   const {
