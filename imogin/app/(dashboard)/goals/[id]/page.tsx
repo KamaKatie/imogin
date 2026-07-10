@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { BackLink } from "@/components/back-link"
+import { PageBreadcrumbs } from "@/lib/page-info"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
 
 export default async function GoalDetailPage({
@@ -28,7 +28,6 @@ export default async function GoalDetailPage({
   if (!goal) {
     return (
       <div className="space-y-6">
-        <BackLink />
         <h1 className="text-2xl font-bold">Goal not found</h1>
       </div>
     )
@@ -39,9 +38,7 @@ export default async function GoalDetailPage({
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <BackLink />
-      </div>
+      <PageBreadcrumbs items={[{ label: "Goals", href: "/goals" }, { label: goal.name }]} />
 
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between mb-4">

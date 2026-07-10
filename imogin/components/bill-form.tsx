@@ -1,143 +1,100 @@
-"use client"
+"use client";
 
-import { useState, useRef, useMemo, useEffect } from "react"
-import { createBill, updateBill } from "@/lib/actions/bills"
-import { uploadBillIcon } from "@/lib/actions/storage"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useMemo, useEffect } from "react";
+import { createBill, updateBill } from "@/lib/actions/bills";
+import { uploadBillIcon } from "@/lib/actions/storage";
+import { useRouter } from "next/navigation";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog"
-import type { BillingCycle } from "@/lib/supabase/types-extension"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { calculatePreviewDate, getOrdinal } from "@/lib/dates";
+import type { BillingCycle } from "@/lib/supabase/types-extension";
 
 interface BillFormProps {
-  categories?: Array<{ id: string; name: string; type: string }>
-  accounts?: Array<{ id: string; name: string; is_shared: boolean }>
-  userId?: string
-  partnerUserId?: string
-  partnerName?: string
+  categories?: Array<{ id: string; name: string; type: string }>;
+  accounts?: Array<{ id: string; name: string; is_shared: boolean }>;
+  userId?: string;
+  partnerUserId?: string;
+  partnerName?: string;
 }
 
-function calculatePreviewDate(dueDay: number, billingCycle: BillingCycle): string | null {
-  if (!dueDay || dueDay < 1 || dueDay > 31) return null
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-  const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()
-  const clamp = (d: number, y: number, m: number) => Math.min(d, daysInMonth(y, m))
-
-  switch (billingCycle) {
-    case "monthly": {
-      const clamped = clamp(dueDay, year, month)
-      let candidate = new Date(year, month - 1, clamped)
-      if (candidate <= now) {
-        const nextMonth = month === 12 ? 1 : month + 1
-        const nextYear = month === 12 ? year + 1 : year
-        candidate = new Date(nextYear, nextMonth - 1, clamp(dueDay, nextYear, nextMonth))
-      }
-      return candidate.toISOString().split("T")[0]
-    }
-    case "weekly": {
-      const clamped = clamp(dueDay, year, month)
-      let candidate = new Date(year, month - 1, clamped)
-      if (candidate <= now) {
-        candidate = new Date(candidate.getTime() + 7 * 24 * 60 * 60 * 1000)
-      }
-      return candidate.toISOString().split("T")[0]
-    }
-    case "quarterly": {
-      const clamped = clamp(dueDay, year, month)
-      let candidate = new Date(year, month - 1, clamped)
-      while (candidate <= now) {
-        const m = candidate.getMonth() + 1 + 3
-        const y = candidate.getFullYear() + (m > 12 ? 1 : 0)
-        const monthIdx = m > 12 ? m - 13 : m - 1
-        candidate = new Date(y, monthIdx, clamp(dueDay, y, monthIdx + 1))
-      }
-      return candidate.toISOString().split("T")[0]
-    }
-    case "yearly": {
-      const clamped = clamp(dueDay, year, month)
-      let candidate = new Date(year, month - 1, clamped)
-      if (candidate <= now) {
-        candidate = new Date(year + 1, month - 1, clamp(dueDay, year + 1, month))
-      }
-      return candidate.toISOString().split("T")[0]
-    }
-  }
-}
-
-function getOrdinal(n: number) {
-  if (n > 3 && n < 21) return "th"
-  switch (n % 10) { case 1: return "st"; case 2: return "nd"; case 3: return "rd"; default: return "th" }
-}
-
-export function BillForm({ categories = [], accounts = [], userId, partnerUserId, partnerName }: BillFormProps) {
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState("")
-  const [splitMethod, setSplitMethod] = useState("equal")
-  const [iconPreview, setIconPreview] = useState<string | null>(null)
-  const [dueDay, setDueDay] = useState("")
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
-  const fileInputRef = useRef<HTMLInputElement>(null)
+export function BillForm({
+  categories = [],
+  accounts = [],
+  userId,
+  partnerUserId,
+  partnerName,
+}: BillFormProps) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [splitMethod, setSplitMethod] = useState("equal");
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [dueDay, setDueDay] = useState("");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const previewDate = useMemo(() => {
-    const day = parseInt(dueDay, 10)
-    if (isNaN(day)) return null
-    return calculatePreviewDate(day, billingCycle)
-  }, [dueDay, billingCycle])
+    const day = parseInt(dueDay, 10);
+    if (isNaN(day)) return null;
+    return calculatePreviewDate(day, billingCycle);
+  }, [dueDay, billingCycle]);
 
   useEffect(() => {
     if (!open) {
-      setDueDay("")
-      setBillingCycle("monthly")
-      setSplitMethod("equal")
-      setIconPreview(null)
-      setError("")
+      setDueDay("");
+      setBillingCycle("monthly");
+      setSplitMethod("equal");
+      setIconPreview(null);
+      setError("");
     }
-  }, [open])
+  }, [open]);
 
   const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      setIconPreview(URL.createObjectURL(file))
+      setIconPreview(URL.createObjectURL(file));
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setPending(true)
-    setError("")
-    const form = e.currentTarget
+    e.preventDefault();
+    setPending(true);
+    setError("");
+    const form = e.currentTarget;
     try {
-      const fd = new FormData(form)
-      const result = await createBill(fd)
+      const fd = new FormData(form);
+      const result = await createBill(fd);
 
-      const file = fileInputRef.current?.files?.[0]
+      const file = fileInputRef.current?.files?.[0];
       if (file && result.id) {
-        const iconFd = new FormData()
-        iconFd.set("icon", file)
-        const iconUrl = await uploadBillIcon(result.id, iconFd)
+        const iconFd = new FormData();
+        iconFd.set("icon", file);
+        const iconUrl = await uploadBillIcon(result.id, iconFd);
         if (iconUrl) {
-          const updateFd = new FormData()
-          updateFd.set("icon_url", iconUrl)
+          const updateFd = new FormData();
+          updateFd.set("icon_url", iconUrl);
           for (const [key, val] of new FormData(form).entries()) {
-            if (key !== "icon") updateFd.set(key, val)
+            if (key !== "icon") updateFd.set(key, val);
           }
-          await updateBill(result.id, updateFd)
+          await updateBill(result.id, updateFd);
         }
       }
 
-      setOpen(false)
-      router.refresh()
+      setOpen(false);
+      router.refresh();
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
-    setPending(false)
-  }
+    setPending(false);
+  };
 
-  const expCategories = categories.filter(c => c.type === "expense")
+  const expCategories = categories.filter((c) => c.type === "expense");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -152,18 +109,46 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="name" className="text-sm font-medium">Name</label>
-            <input id="name" name="name" required className="w-full rounded-lg border bg-background px-3 py-2 text-sm" placeholder="e.g. Netflix" />
+            <label htmlFor="name" className="text-sm font-medium">
+              Name
+            </label>
+            <input
+              id="name"
+              name="name"
+              required
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              placeholder="e.g. Netflix"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="amount" className="text-sm font-medium">Amount (¥)</label>
-              <input id="amount" name="amount" type="number" step="0.01" required className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
+              <label htmlFor="amount" className="text-sm font-medium">
+                Amount (¥)
+              </label>
+              <input
+                id="amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                required
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              />
             </div>
             <div className="space-y-2">
-              <label htmlFor="billing_cycle" className="text-sm font-medium">Billing Cycle</label>
-              <select id="billing_cycle" name="billing_cycle" required value={billingCycle} onChange={e => setBillingCycle(e.target.value as BillingCycle)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
+              <label htmlFor="billing_cycle" className="text-sm font-medium">
+                Billing Cycle
+              </label>
+              <select
+                id="billing_cycle"
+                name="billing_cycle"
+                required
+                value={billingCycle}
+                onChange={(e) =>
+                  setBillingCycle(e.target.value as BillingCycle)
+                }
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              >
                 <option value="monthly">Monthly</option>
                 <option value="weekly">Weekly</option>
                 <option value="quarterly">Quarterly</option>
@@ -174,43 +159,95 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="due_day" className="text-sm font-medium">Due Day</label>
-              <input id="due_day" name="due_day" type="number" min="1" max="31" required value={dueDay} onChange={e => setDueDay(e.target.value)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm" placeholder="e.g. 15" />
+              <label htmlFor="due_day" className="text-sm font-medium">
+                Due Day
+              </label>
+              <input
+                id="due_day"
+                name="due_day"
+                type="number"
+                min="1"
+                max="31"
+                required
+                value={dueDay}
+                onChange={(e) => setDueDay(e.target.value)}
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                placeholder="e.g. 15"
+              />
               {previewDate && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Next: {new Date(previewDate).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}
+                  Next:{" "}
+                  {new Date(previewDate).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor="category_id" className="text-sm font-medium">Category</label>
-              <select id="category_id" name="category_id" className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
+              <label htmlFor="category_id" className="text-sm font-medium">
+                Category
+              </label>
+              <select
+                id="category_id"
+                name="category_id"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              >
                 <option value="">No category</option>
-                {expCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {expCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="url" className="text-sm font-medium">Website URL</label>
-            <input id="url" name="url" type="url" className="w-full rounded-lg border bg-background px-3 py-2 text-sm" placeholder="e.g. https://netflix.com" />
+            <label htmlFor="url" className="text-sm font-medium">
+              Website URL
+            </label>
+            <input
+              id="url"
+              name="url"
+              type="url"
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              placeholder="e.g. https://netflix.com"
+            />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="payment_account_id" className="text-sm font-medium">Payment Account</label>
-            <select id="payment_account_id" name="payment_account_id" className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
+            <label htmlFor="payment_account_id" className="text-sm font-medium">
+              Payment Account
+            </label>
+            <select
+              id="payment_account_id"
+              name="payment_account_id"
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            >
               <option value="">No account</option>
-              {accounts.map(a => (
-                <option key={a.id} value={a.id}>{a.name}{a.is_shared ? " (Shared)" : " (Personal)"}</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.is_shared ? " (Shared)" : " (Personal)"}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="split_method" className="text-sm font-medium">Split Method</label>
-            <select id="split_method" name="split_method" value={splitMethod} onChange={e => setSplitMethod(e.target.value)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
+            <label htmlFor="split_method" className="text-sm font-medium">
+              Split Method
+            </label>
+            <select
+              id="split_method"
+              name="split_method"
+              value={splitMethod}
+              onChange={(e) => setSplitMethod(e.target.value)}
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            >
               <option value="equal">Equal (50/50)</option>
               <option value="covered">Covered (one pays)</option>
               <option value="custom">Custom %</option>
@@ -222,11 +259,22 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
               <label className="text-sm font-medium">Who pays?</label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" name="split_payer_user_id" value={userId || ""} defaultChecked className="rounded-full" />
+                  <input
+                    type="radio"
+                    name="split_payer_user_id"
+                    value={userId || ""}
+                    defaultChecked
+                    className="rounded-full"
+                  />
                   Me
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" name="split_payer_user_id" value={partnerUserId || ""} className="rounded-full" />
+                  <input
+                    type="radio"
+                    name="split_payer_user_id"
+                    value={partnerUserId || ""}
+                    className="rounded-full"
+                  />
                   {partnerName}
                 </label>
               </div>
@@ -237,12 +285,29 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Your %</label>
-                <input name="your_percent" type="number" min="0" max="100" defaultValue={50} className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
+                <input
+                  name="your_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  defaultValue={50}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">{partnerName}&apos;s %</label>
-                <input name="partner_user_id" type="hidden" value={partnerUserId} />
-                <input disabled className="w-full rounded-lg border bg-background px-3 py-2 text-sm" value={`${100 - 50}%`} />
+                <label className="text-sm font-medium">
+                  {partnerName}&apos;s %
+                </label>
+                <input
+                  name="partner_user_id"
+                  type="hidden"
+                  value={partnerUserId}
+                />
+                <input
+                  disabled
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                  value={`${100 - 50}%`}
+                />
               </div>
             </div>
           )}
@@ -251,7 +316,11 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
             <label className="text-sm font-medium">Logo / Icon</label>
             <div className="flex items-center gap-3">
               {iconPreview && (
-                <img src={iconPreview} alt="Preview" className="w-10 h-10 rounded-lg object-contain border" />
+                <img
+                  src={iconPreview}
+                  alt="Preview"
+                  className="w-10 h-10 rounded-lg object-contain border"
+                />
               )}
               <input
                 ref={fileInputRef}
@@ -266,11 +335,15 @@ export function BillForm({ categories = [], accounts = [], userId, partnerUserId
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button type="submit" disabled={pending} className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+          >
             {pending ? "Creating..." : "Create Bill"}
           </button>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

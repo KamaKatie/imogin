@@ -1,19 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { BudgetForm } from "@/components/budget-form"
+import { getPartnershipId } from "@/lib/queries"
 
 export default async function BudgetsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  const partnershipId = membership?.partnership_id || null
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   const { data: categories } = partnershipId ? await supabase
     .from("categories")
@@ -33,27 +28,24 @@ export default async function BudgetsPage() {
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const budgetsWithSpending = await Promise.all(
-    (budgets.data || []).map(async (budget) => {
-      let spent = 0
-      const baseQuery = supabase
-        .from("transactions")
-        .select("amount")
-        .eq("category_id", budget.category_id)
-        .eq("type", "expense")
-        .gte("date", firstOfMonth)
-        .lte("date", lastOfMonth)
+  const categoryIds = (budgets.data || []).map(b => b.category_id).filter(Boolean)
+  const { data: txns } = await supabase
+    .from("transactions")
+    .select("amount, category_id, user_id")
+    .in("category_id", categoryIds)
+    .eq("type", "expense")
+    .gte("date", firstOfMonth)
+    .lte("date", lastOfMonth)
 
-      if (!budget.user_id) {
-        const { data: txns } = await baseQuery
-        spent = txns?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0
-      } else {
-        const { data: txns } = await baseQuery
-        spent = txns?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0
-      }
-      return { ...budget, spent }
-    })
-  )
+  const budgetsWithSpending = (budgets.data || []).map((budget) => {
+    let spent = 0
+    for (const t of txns || []) {
+      if (t.category_id !== budget.category_id) continue
+      if (budget.user_id && t.user_id !== user.id) continue
+      spent += Math.abs(t.amount)
+    }
+    return { ...budget, spent }
+  })
 
   const totalBudgeted = budgetsWithSpending.reduce((sum, b) => sum + b.amount, 0)
   const totalSpent = budgetsWithSpending.reduce((sum, b) => sum + b.spent, 0)

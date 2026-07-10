@@ -1,11 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import Link from "next/link"
-
-function getOrdinal(n: number) {
-  if (n > 3 && n < 21) return "th"
-  switch (n % 10) { case 1: return "st"; case 2: return "nd"; case 3: return "rd"; default: return "th" }
-}
+import { PageBreadcrumbs } from "@/lib/page-info"
+import { getOrdinal } from "@/lib/dates"
+import { getPartnershipId, getPartnerUserId } from "@/lib/queries"
 
 export default async function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -13,15 +10,9 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
-  if (!membership) redirect("/bills")
-
-  const partnershipId = membership.partnership_id
+  if (!partnershipId) redirect("/bills")
 
   const { data: bill, error } = await supabase
     .from("bills")
@@ -37,11 +28,7 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
 
   if (error || !bill) redirect("/bills")
 
-  const { data: memberRows } = await supabase
-    .from("partnership_members")
-    .select("user_id")
-    .eq("partnership_id", partnershipId)
-  const partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
+  const partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id)
 
   let partnerName: string | null = null
   if (partnerUserId) {
@@ -85,9 +72,7 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Link href="/bills" className="text-sm text-muted-foreground hover:text-foreground transition-colors">&larr; Back to Bills</Link>
-      </div>
+      <PageBreadcrumbs items={[{ label: "Bills", href: "/bills" }, { label: bill.name }]} />
 
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center gap-4">

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Settings, Sun, Moon, Laptop, ChevronRight } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  Sun, 
+  Moon,
+  Laptop,
+  ChevronRight,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -25,9 +32,11 @@ const navItems = [
 ];
 
 interface AccountItem {
-  id: string
-  name: string
-  balance: number
+  id: string;
+  name: string;
+  balance: number;
+  icon: string | null;
+  type: string;
 }
 
 const planningItems = [
@@ -161,7 +170,7 @@ const iconMap: Record<string, React.ReactNode> = {
   ),
 };
 
-export function Sidebar() {
+export function Sidebar({ refreshKey }: { refreshKey: number }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -169,33 +178,40 @@ export function Sidebar() {
   const [planningOpen, setPlanningOpen] = useState(true);
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [fullName, setFullName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user) return;
 
-      supabase.from("profiles").select("name, email").eq("id", user.id).single().then(({ data: profile }) => {
-        setFullName(profile?.name || profile?.email || user.email || "");
-      })
+      supabase
+        .from("profiles")
+        .select("name, email, avatar_url")
+        .eq("id", user.id)
+        .single()
+        .then(({ data: profile }) => {
+          setFullName(profile?.name || profile?.email || user.email || "");
+          setAvatarUrl(profile?.avatar_url || "");
+        });
 
       getPartnershipId(supabase, user.id).then((partnershipId) => {
-          const q = supabase
-            .from("accounts")
-            .select("id, name, balance")
-            .or(
-              partnershipId
-                ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-                : `user_id.eq.${user.id}`
-            )
-            .order("name")
-          q.then(({ data }) => {
-            if (data) setAccounts(data)
-          })
-        })
-    })
-  }, [supabase])
+        const q = supabase
+          .from("accounts")
+          .select("id, name, balance, icon, type")
+          .or(
+            partnershipId
+              ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
+              : `user_id.eq.${user.id}`,
+          )
+          .order("name");
+        q.then(({ data }) => {
+          if (data) setAccounts(data);
+        });
+      });
+    });
+    }, [supabase, refreshKey]);
 
-  const initials = fullName ? fullName.charAt(0).toUpperCase() : "?"
+  const initials = fullName ? fullName.charAt(0).toUpperCase() : "?";
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -205,8 +221,11 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-card border-r flex flex-col z-40">
       <div className="p-5">
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight">
-          <img src="/logo.png" alt="Imogin" className="w-6 h-6 rounded-md" />
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-xl font-bold tracking-tight"
+        >
+          <img src="/imogin.png" alt="Imogin" className="w-6 h-6 rounded-md" />
           IMOGIN
         </Link>
       </div>
@@ -221,9 +240,9 @@ export function Sidebar() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "text-foreground font-semibold underline underline-offset-4 decoration-2 decoration-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                isActive
+                  ? "text-foreground font-semibold underline underline-offset-4 decoration-2 decoration-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
               {iconMap[item.icon] || null}
@@ -246,7 +265,9 @@ export function Sidebar() {
         </Link>
         <div className="rounded-lg bg-muted/40 p-2 space-y-0.5">
           {accounts.length === 0 ? (
-            <p className="px-2 py-1 text-xs text-muted-foreground">No accounts yet</p>
+            <p className="px-2 py-1 text-xs text-muted-foreground">
+              No accounts yet
+            </p>
           ) : (
             accounts.map((a) => (
               <Link
@@ -255,12 +276,23 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center justify-between px-2 py-1.5 rounded text-sm font-medium transition-colors",
                   pathname === "/accounts/" + a.id
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-accent text-foreground font-medium"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
-                <span className="truncate">{a.name}</span>
-                <span className="shrink-0 ml-2">¥{Math.abs(a.balance).toLocaleString()}</span>
+                <span className="flex items-center gap-2 truncate">
+                  {a.icon && (
+                    <img
+                      src={a.icon}
+                      alt=""
+                      className="w-4 h-4 rounded object-contain shrink-0"
+                    />
+                  )}
+                  <span className="truncate">{a.name}</span>
+                </span>
+                <span className="shrink-0 ml-2">
+                  ¥{Math.abs(a.balance).toLocaleString()}
+                </span>
               </Link>
             ))
           )}
@@ -306,39 +338,70 @@ export function Sidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-accent transition-colors">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium shrink-0">
-                {initials}
-              </div>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium shrink-0">
+                  {initials}
+                </div>
+              )}
               <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium truncate">{fullName || "Account"}</p>
+                <p className="text-sm font-medium truncate">
+                  {fullName || "Account"}
+                </p>
               </div>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
             <DropdownMenuItem asChild>
-              <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
+              <Link
+                href="/settings"
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <Settings size={16} />
                 Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="flex items-center gap-2 cursor-pointer">
-                {theme === "light" ? <Sun size={16} /> : theme === "dark" ? <Moon size={16} /> : <Laptop size={16} />}
+                {theme === "light" ? (
+                  <Sun size={16} />
+                ) : theme === "dark" ? (
+                  <Moon size={16} />
+                ) : (
+                  <Laptop size={16} />
+                )}
                 Theme
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => setTheme("light")} className="flex items-center gap-2 cursor-pointer">
+                <DropdownMenuItem
+                  onClick={() => setTheme("light")}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <Sun size={16} /> Light
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")} className="flex items-center gap-2 cursor-pointer">
+                <DropdownMenuItem
+                  onClick={() => setTheme("dark")}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <Moon size={16} /> Dark
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")} className="flex items-center gap-2 cursor-pointer">
+                <DropdownMenuItem
+                  onClick={() => setTheme("system")}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <Laptop size={16} /> System
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="flex items-center gap-2 cursor-pointer"
+            >
               <LogOut size={16} />
               Sign out
             </DropdownMenuItem>

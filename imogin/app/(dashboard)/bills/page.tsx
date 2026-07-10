@@ -3,11 +3,8 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { BillForm } from "@/components/bill-form"
 import { BillEditDialog } from "@/components/bill-edit-dialog"
-
-function getOrdinal(n: number) {
-  if (n > 3 && n < 21) return "th"
-  switch (n % 10) { case 1: return "st"; case 2: return "nd"; case 3: return "rd"; default: return "th" }
-}
+import { getOrdinal } from "@/lib/dates"
+import { getPartnershipId, getPartnerUserId } from "@/lib/queries"
 
 function formatDueDay(day: number | null, dateStr: string) {
   if (day) return `Due on the ${day}${getOrdinal(day)}`
@@ -20,13 +17,7 @@ export default async function BillsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  const partnershipId = membership?.partnership_id || null
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   let accounts: Array<{ id: string; name: string; is_shared: boolean }> = []
   let partnerName: string | null = null
@@ -54,11 +45,7 @@ export default async function BillsPage() {
 
     accounts = [...(personal || []), ...(shared || [])]
 
-    const { data: memberRows } = await supabase
-      .from("partnership_members")
-      .select("user_id")
-      .eq("partnership_id", partnershipId)
-    partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
+    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id)
     if (partnerUserId) {
       const { data: profile } = await supabase
         .from("profiles")

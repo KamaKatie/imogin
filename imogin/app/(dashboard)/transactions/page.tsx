@@ -1,6 +1,9 @@
 ﻿import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TransactionForm } from "@/components/transaction-form";
+import { formatRelativeDate } from "@/lib/dates";
+import { getCategoryIcon } from "@/lib/icons";
+import { getPartnershipId, getPartnerUserId } from "@/lib/queries";
 import Link from "next/link";
 
 export default async function TransactionsPage() {
@@ -10,17 +13,11 @@ export default async function TransactionsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const partnershipId = membership?.partnership_id || null;
+  const partnershipId = await getPartnershipId(supabase, user.id);
 
   const { data: accounts } = await supabase
     .from("accounts")
-    .select("id, name, is_shared, partnership_id, user_id")
+    .select("id, name, icon, is_shared, partnership_id, user_id")
     .or(
       partnershipId
         ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
@@ -30,7 +27,9 @@ export default async function TransactionsPage() {
   const allAccounts = accounts || [];
 
   let allTxns: unknown[] = [];
-  let categories: { id: string; name: string; type: string }[] = [];
+  let categories: { id: string; name: string; type: string; icon: string | null; color: string | null }[] = [];
+
+  let sharedAccountIds: string[] = [];
 
   if (partnershipId) {
     const { data: sharedAccounts } = await supabase
@@ -39,64 +38,63 @@ export default async function TransactionsPage() {
       .eq("partnership_id", partnershipId)
       .eq("is_shared", true);
 
-    const sharedAccountIds = sharedAccounts?.map((a) => a.id) || [];
-
-    let txnQuery = supabase
-      .from("transactions")
-      .select(
-        `
-        *,
-        accounts!inner(*),
-        categories(*),
-        transaction_splits(*)
-      `,
-      )
-
-    if (sharedAccountIds.length > 0) {
-      txnQuery = txnQuery.or(
-        `user_id.eq.${user.id},account_id.in.(${sharedAccountIds.join(",")})`,
-      )
-    } else {
-      txnQuery = txnQuery.eq("user_id", user.id)
-    }
-
-    const { data } = await txnQuery
-      .order("date", { ascending: false })
-      .limit(100);
-
-    allTxns = data || [];
+    sharedAccountIds = sharedAccounts?.map((a) => a.id) || [];
 
     const catResult = await supabase
       .from("categories")
-      .select("id, name, type")
+      .select("id, name, type, icon, color")
       .eq("partnership_id", partnershipId);
 
     categories = catResult.data || [];
-  } else {
-    const { data } = await supabase
+  }
+
+  const { data: myTxns } = await supabase
+    .from("transactions")
+    .select(`*, accounts!account_id(*), categories(*), transaction_splits(*)`)
+    .eq("user_id", user.id)
+    .order("date", { ascending: false })
+    .limit(100);
+
+  allTxns = myTxns || [];
+
+  if (sharedAccountIds.length > 0) {
+    const { data: sharedTxns } = await supabase
       .from("transactions")
-      .select(
-        `
-        *,
-        accounts(*),
-        categories(*),
-        transaction_splits(*)
-      `,
-      )
-      .eq("user_id", user.id)
+      .select(`*, accounts!account_id(*), categories(*), transaction_splits(*)`)
+      .in("account_id", sharedAccountIds)
+      .neq("user_id", user.id)
       .order("date", { ascending: false })
       .limit(100);
 
-    allTxns = data || [];
+    if (sharedTxns) {
+      allTxns = [...allTxns, ...sharedTxns]
+        .sort((a: { date: string }, b: { date: string }) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 100);
+    }
   }
 
   let partnerUserId: string | null = null;
+  let partnerProfile: { name: string | null; email: string; avatar_url: string | null } | null = null;
+  let userProfile: { name: string | null; email: string; avatar_url: string | null } | null = null;
+
   if (partnershipId) {
-    const { data: memberRows } = await supabase
-      .from("partnership_members")
-      .select("user_id")
-      .eq("partnership_id", partnershipId)
-    partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
+    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id)
+
+    const { data: up } = await supabase
+      .from("profiles")
+      .select("name, email, avatar_url")
+      .eq("id", user.id)
+      .single()
+    userProfile = up
+
+    if (partnerUserId) {
+      const { data: pp } = await supabase
+        .from("profiles")
+        .select("name, email, avatar_url")
+        .eq("id", partnerUserId)
+        .single()
+      partnerProfile = pp
+    }
   }
 
   return (
@@ -108,6 +106,9 @@ export default async function TransactionsPage() {
           categories={categories}
           partnershipId={partnershipId}
           partnerUserId={partnerUserId}
+          userId={user.id}
+          userProfile={userProfile}
+          partnerProfile={partnerProfile}
         />
       </div>
 
@@ -117,57 +118,74 @@ export default async function TransactionsPage() {
             <p>No transactions yet</p>
           </div>
         ) : (
-          <div className="divide-y">
-            {(
-              allTxns as Array<{
-                id: string;
-                amount: number;
-                description: string | null;
-                date: string;
-                type: string;
-                is_split: boolean;
-                transfer_group_id: string | null;
-                category_id: string | null;
-                notes: string | null;
-                accounts: { name: string; is_shared: boolean } | null;
-                categories: { name: string; color: string | null } | null;
-                transaction_splits: Array<{
-                  user_id: string;
+          <>
+            <div className="hidden sm:grid sm:grid-cols-[1fr_2fr_1.5fr_1fr] gap-4 px-4 py-3 text-xs text-muted-foreground font-medium border-b">
+              <span>Date</span>
+              <span>Description</span>
+              <span>Category</span>
+              <span className="text-right">Amount</span>
+            </div>
+            <div className="divide-y">
+              {(
+                allTxns as Array<{
+                  id: string;
                   amount: number;
-                }> | null;
-              }>
-            ).map((t) => (
-              <Link
-                key={t.id}
-                href={"/transactions/" + t.id}
-                className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${t.type === "income" ? "bg-green-500" : t.type === "transfer" ? "bg-blue-500" : "bg-red-500"}`}
-                  />
-                  <div>
-                    <p className="text-sm font-medium">
+                  description: string | null;
+                  date: string;
+                  type: string;
+                  is_split: boolean;
+                  transfer_group_id: string | null;
+                  category_id: string | null;
+                  notes: string | null;
+                  accounts: { name: string; is_shared: boolean } | null;
+                  categories: { name: string; color: string | null; icon: string | null } | null;
+                  transaction_splits: Array<{
+                    user_id: string;
+                    amount: number;
+                  }> | null;
+                }>
+              ).map((t) => (
+                <Link
+                  key={t.id}
+                  href={"/transactions/" + t.id}
+                  className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[1fr_2fr_1.5fr_1fr] gap-4 px-4 py-3 items-center hover:bg-accent/50 transition-colors"
+                >
+                  <span className="text-xs text-muted-foreground whitespace-nowrap" title={t.date}>
+                    {formatRelativeDate(t.date)}
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
                       {t.description ||
                         (t.type === "transfer" ? "Transfer" : "No description")}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t.date} &middot; {t.accounts?.name || "Unknown account"}
+                    <p className="text-xs text-muted-foreground truncate flex flex-wrap gap-x-1">
+                      {t.accounts?.name || "Unknown account"}
                       {t.accounts?.is_shared && (
-                        <span className="ml-1 text-primary">(shared)</span>
+                        <span className="text-primary">(shared)</span>
                       )}
                       {t.is_split && (
-                        <span className="ml-1 text-orange-500">(split)</span>
+                        <span className="text-orange-500">(split)</span>
                       )}
                       {t.type === "transfer" && (
-                        <span className="ml-1 text-blue-500">(transfer)</span>
+                        <span className="text-blue-500">(transfer)</span>
                       )}
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
+
+                  <div className="flex justify-end sm:justify-start">
+                    {t.categories ? (
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: (t.categories.color || "#6B7280") + "18", color: t.categories.color || undefined }}>
+                        {t.categories.icon && getCategoryIcon(t.categories.icon, 10)}
+                        {t.categories.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
+
                   <p
-                    className={`text-sm font-medium ${t.type === "income" ? "text-green-600" : t.type === "transfer" ? "text-blue-600" : "text-red-600"}`}
+                    className={`text-sm font-medium text-right tabular-nums ${t.type === "income" ? "text-green-600" : t.type === "transfer" ? "text-blue-600" : "text-red-600"}`}
                   >
                     {t.type === "income"
                       ? "+"
@@ -176,15 +194,10 @@ export default async function TransactionsPage() {
                         : "-"}
                     ¥{Math.abs(t.amount).toLocaleString()}
                   </p>
-                  {t.categories && (
-                    <p className="text-xs text-muted-foreground">
-                      {t.categories.name}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

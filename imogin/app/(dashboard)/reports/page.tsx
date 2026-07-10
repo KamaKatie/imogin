@@ -1,7 +1,17 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { ReportCharts } from "@/components/report-charts"
+import { MonthlyLineChart } from "@/components/monthly-line-chart"
 import { getPartnershipId } from "@/lib/queries"
+
+function getMonthRange() {
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const start = new Date(now.getFullYear(), now.getMonth() - 23, 1)
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  }
+}
 
 export default async function ReportsPage() {
   const supabase = await createClient()
@@ -9,13 +19,6 @@ export default async function ReportsPage() {
   if (!user) redirect("/auth/login")
 
   const partnershipId = await getPartnershipId(supabase, user.id)
-
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() + 1
-
-  const firstDay = new Date(year, month - 1, 1).toISOString().split("T")[0]
-  const lastDay = new Date(year, month, 0).toISOString().split("T")[0]
 
   const personalAccountIds = (await supabase
     .from("accounts")
@@ -34,68 +37,63 @@ export default async function ReportsPage() {
 
   const allIds = [...new Set([...sharedAccountIds, ...personalAccountIds])]
 
-  let byCategory: Array<{ category_id: string; name: string; color: string | null; icon: string | null; total: number }> = []
+  let totalBalance = 0
   let totalSpent = 0
   let totalIncome = 0
-  const monthlyTrend: Array<{ month: number; totalSpent: number; totalIncome: number }> = []
+  const monthlyTrend: Array<{ label: string; totalIncome: number; totalSpent: number }> = []
 
   if (allIds.length > 0) {
+    const { data: accounts } = await supabase
+      .from("accounts")
+      .select("balance")
+      .in("id", allIds)
+    totalBalance = accounts?.reduce((s, a) => s + (a.balance || 0), 0) || 0
+
+    const { start, end } = getMonthRange()
+
     const { data: txns } = await supabase
       .from("transactions")
-      .select(`
-        *,
-        categories(*)
-      `)
+      .select("amount, type, date")
       .in("account_id", allIds)
-      .gte("date", firstDay)
-      .lte("date", lastDay)
+      .gte("date", start)
+      .lte("date", end)
+      .order("date", { ascending: true })
 
-    const expenses = txns?.filter(t => t.type === "expense") || []
-    const incomes = txns?.filter(t => t.type === "income") || []
+    if (txns) {
+      totalSpent = txns.filter(t => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0)
+      totalIncome = txns.filter(t => t.type === "income").reduce((s, t) => s + Math.abs(t.amount), 0)
 
-    totalSpent = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    totalIncome = incomes.reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
-    const categoryMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
-    for (const t of expenses) {
-      const key = t.category_id || "uncategorized"
-      const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
-      const existing = categoryMap.get(key) || {
-        name: cat?.name || "Uncategorized",
-        color: cat?.color || null,
-        icon: cat?.icon || null,
-        total: 0,
+      const monthMap = new Map<string, { totalIncome: number; totalSpent: number }>()
+      for (const t of txns) {
+        const key = t.date.slice(0, 7)
+        const entry = monthMap.get(key) || { totalIncome: 0, totalSpent: 0 }
+        if (t.type === "income") entry.totalIncome += Math.abs(t.amount)
+        else if (t.type === "expense") entry.totalSpent += Math.abs(t.amount)
+        monthMap.set(key, entry)
       }
-      existing.total += Math.abs(t.amount)
-      categoryMap.set(key, existing)
-    }
-    byCategory = Array.from(categoryMap.entries())
-      .map(([id, data]) => ({ category_id: id, ...data }))
-      .sort((a, b) => b.total - a.total)
 
-    for (let m = 1; m <= 12; m++) {
-      const fd = new Date(year, m - 1, 1).toISOString().split("T")[0]
-      const ld = new Date(year, m, 0).toISOString().split("T")[0]
-
-      const { data: monthTxns } = await supabase
-        .from("transactions")
-        .select("amount, type")
-        .in("account_id", allIds)
-        .gte("date", fd)
-        .lte("date", ld)
-
-      const monthExpenses = monthTxns?.filter(t => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0) || 0
-      const monthIncomes = monthTxns?.filter(t => t.type === "income").reduce((s, t) => s + Math.abs(t.amount), 0) || 0
-
-      monthlyTrend.push({ month: m, totalSpent: monthExpenses, totalIncome: monthIncomes })
+      const now = new Date()
+      for (let i = 23; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        const label = d.toLocaleString("default", { month: "short", year: "2-digit" })
+        const data = monthMap.get(key) || { totalIncome: 0, totalSpent: 0 }
+        monthlyTrend.push({ label, ...data })
+      }
     }
   }
 
+  const now = new Date()
+
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">Spending insights for {new Date(year, month - 1).toLocaleString("default", { month: "long", year: "numeric" })}</p>
+      <p className="text-muted-foreground">Spending overview for the last 12 months</p>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="rounded-xl border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Current Balance</p>
+          <p className="text-2xl font-bold mt-1">¥{totalBalance.toLocaleString()}</p>
+        </div>
         <div className="rounded-xl border bg-card p-5">
           <p className="text-sm text-muted-foreground">Total Spent</p>
           <p className="text-2xl font-bold mt-1 text-red-600">¥{totalSpent.toLocaleString()}</p>
@@ -112,7 +110,10 @@ export default async function ReportsPage() {
         </div>
       </div>
 
-      <ReportCharts byCategory={byCategory} monthlyTrend={monthlyTrend} />
+      <div className="rounded-xl border bg-card p-5">
+        <h2 className="font-semibold mb-4">Monthly Overview</h2>
+        <MonthlyLineChart data={monthlyTrend} />
+      </div>
     </div>
   )
 }

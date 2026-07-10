@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { createTransaction } from "@/lib/actions/transactions"
 import { useRouter } from "next/navigation"
+import { getCategoryIcon } from "@/lib/icons"
+import { DropdownSelect } from "@/components/ui/dropdown-select"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
@@ -10,6 +12,7 @@ import {
 interface AccountOption {
   id: string
   name: string
+  icon: string | null
   is_shared: boolean
   partnership_id: string | null
   user_id: string | null
@@ -19,6 +22,14 @@ interface CategoryOption {
   id: string
   name: string
   type: string
+  icon: string | null
+  color: string | null
+}
+
+interface ProfileInfo {
+  name: string | null
+  email: string
+  avatar_url: string | null
 }
 
 interface TransactionFormProps {
@@ -26,9 +37,32 @@ interface TransactionFormProps {
   categories: CategoryOption[]
   partnershipId: string | null
   partnerUserId: string | null
+  userId: string
+  userProfile: ProfileInfo | null
+  partnerProfile: ProfileInfo | null
 }
 
-export function TransactionForm({ accounts, categories, partnershipId, partnerUserId }: TransactionFormProps) {
+function getAvatarUrl(profile: ProfileInfo | null): string | null {
+  if (profile?.avatar_url) return profile.avatar_url
+  return null
+}
+
+function AvatarCircle({ url, name, email, size = 32 }: { url?: string | null; name?: string | null; email?: string; size?: number }) {
+  const initials = (name || email || "?").charAt(0).toUpperCase()
+  return (
+    <div className="rounded-full overflow-hidden shrink-0" style={{ width: size, height: size }}>
+      {url ? (
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-muted text-xs font-medium text-muted-foreground">
+          {initials}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userId, userProfile, partnerProfile }: TransactionFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -36,16 +70,17 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
   const [type, setType] = useState("expense")
   const [selectedAccount, setSelectedAccount] = useState("")
   const [toAccountId, setToAccountId] = useState("")
-  const [splitEnabled, setSplitEnabled] = useState(false)
-  const [splitMethod, setSplitMethod] = useState<"equal" | "custom" | "covered">("equal")
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [forSelection, setForSelection] = useState<"me" | "partner" | "both">("me")
 
   const isTransfer = type === "transfer"
-  const selectedAccountObj = accounts.find(a => a.id === selectedAccount)
-  const isSharedAccount = selectedAccountObj?.is_shared ?? false
-  const canSplit = Boolean(partnershipId && isSharedAccount && !isTransfer)
 
   const filteredCategories = categories.filter(c => c.type === type)
   const availableToAccounts = accounts.filter(a => a.id !== selectedAccount)
+  const partnerName = partnerProfile?.name || partnerProfile?.email || "Partner"
+  const userName = userProfile?.name || userProfile?.email || "Me"
+  const userAvatarUrl = getAvatarUrl(userProfile)
+  const partnerAvatarUrl = partnerUserId ? getAvatarUrl(partnerProfile) : null
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -53,6 +88,7 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
     setError("")
     try {
       const fd = new FormData(e.currentTarget)
+      fd.set("for_selection", forSelection)
       if (partnerUserId) fd.set("partner_user_id", partnerUserId)
       await createTransaction(fd)
       setOpen(false)
@@ -61,6 +97,16 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
       setError((err as Error).message)
     }
     setPending(false)
+  }
+
+  const toggleFor = (target: "me" | "partner") => {
+    if (forSelection === "both") {
+      setForSelection(target === "me" ? "partner" : "me")
+    } else if (forSelection === target) {
+      return
+    } else {
+      setForSelection("both")
+    }
   }
 
   return (
@@ -77,12 +123,12 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="amount" className="text-sm font-medium">Amount (¥)</label>
+              <label htmlFor="amount" className="text-sm font-medium">Amount</label>
               <input id="amount" name="amount" type="number" step="0.01" required className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
             </div>
             <div className="space-y-2">
               <label htmlFor="type" className="text-sm font-medium">Type</label>
-              <select id="type" name="type" required value={type} onChange={e => { setType(e.target.value); setToAccountId(""); setSplitEnabled(false) }} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
+              <select id="type" name="type" required value={type} onChange={e => { setType(e.target.value); setToAccountId("") }} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
                 <option value="transfer">Transfer</option>
@@ -92,52 +138,91 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
 
           {isTransfer ? (
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="account_id" className="text-sm font-medium">From Account</label>
-                <select id="account_id" name="account_id" required value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                  <option value="">Select source</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}{a.is_shared ? " (Shared)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="to_account_id" className="text-sm font-medium">To Account</label>
-                <select id="to_account_id" name="to_account_id" required value={toAccountId} onChange={e => setToAccountId(e.target.value)} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                  <option value="">Select destination</option>
-                  {availableToAccounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}{a.is_shared ? " (Shared)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <DropdownSelect
+                items={accounts}
+                value={selectedAccount}
+                onChange={v => setSelectedAccount(v)}
+                label="From Account"
+                placeholder="Select source"
+                renderItem={a => (
+                  <>
+                    {a.icon && <img src={a.icon} alt="" className="w-5 h-5 rounded object-contain shrink-0" />}
+                    <span>{a.name}{a.is_shared ? " (Shared)" : ""}</span>
+                  </>
+                )}
+              />
+              <DropdownSelect
+                items={availableToAccounts}
+                value={toAccountId}
+                onChange={v => setToAccountId(v)}
+                label="To Account"
+                placeholder="Select destination"
+                renderItem={a => (
+                  <>
+                    {a.icon && <img src={a.icon} alt="" className="w-5 h-5 rounded object-contain shrink-0" />}
+                    <span>{a.name}{a.is_shared ? " (Shared)" : ""}</span>
+                  </>
+                )}
+              />
+              <input type="hidden" name="account_id" value={selectedAccount} />
+              <input type="hidden" name="to_account_id" value={toAccountId} />
             </div>
           ) : (
             <>
-              <div className="space-y-2">
-                <label htmlFor="account_id" className="text-sm font-medium">Account</label>
-                <select id="account_id" name="account_id" required value={selectedAccount} onChange={e => { setSelectedAccount(e.target.value); setSplitEnabled(false) }} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                  <option value="">Select account</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}{a.is_shared ? " (Shared)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="category_id" className="text-sm font-medium">Category</label>
-                <select id="category_id" name="category_id" className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                  <option value="">None</option>
-                  {filteredCategories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+              <DropdownSelect
+                items={accounts}
+                value={selectedAccount}
+                onChange={v => setSelectedAccount(v)}
+                label="Account"
+                placeholder="Select account"
+                renderItem={a => (
+                  <>
+                    {a.icon && <img src={a.icon} alt="" className="w-5 h-5 rounded object-contain shrink-0" />}
+                    <span>{a.name}{a.is_shared ? " (Shared)" : ""}</span>
+                  </>
+                )}
+              />
+              <DropdownSelect
+                items={filteredCategories}
+                value={selectedCategory}
+                onChange={v => setSelectedCategory(v)}
+                label="Category"
+                placeholder="None"
+                renderItem={c => (
+                  <>
+                    {c.icon && getCategoryIcon(c.icon, 14)}
+                    <span>{c.name}</span>
+                  </>
+                )}
+              />
+              <input type="hidden" name="account_id" value={selectedAccount} />
+              <input type="hidden" name="category_id" value={selectedCategory} />
             </>
+          )}
+
+          {partnershipId && !isTransfer && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Paid for</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleFor("me")}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${forSelection === "me" || forSelection === "both" ? "bg-accent ring-2 ring-primary" : "hover:bg-accent/50"}`}
+                >
+                  <AvatarCircle url={userAvatarUrl} name={userName} email={userProfile?.email} size={24} />
+                  <span className="text-sm font-medium">{userName}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleFor("partner")}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${forSelection === "partner" || forSelection === "both" ? "bg-accent ring-2 ring-primary" : "hover:bg-accent/50"}`}
+                >
+                  <AvatarCircle url={partnerAvatarUrl} name={partnerName} email={partnerProfile?.email} size={24} />
+                  <span className="text-sm font-medium">{partnerName}</span>
+                </button>
+
+              </div>
+            </div>
           )}
 
           <div className="space-y-2">
@@ -151,43 +236,6 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
               <input id="date" name="date" type="date" required defaultValue={new Date().toISOString().split("T")[0]} className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
             </div>
           </div>
-
-          {canSplit && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" checked={splitEnabled} onChange={e => setSplitEnabled(e.target.checked)} className="rounded border-gray-300" />
-                Split with partner
-              </label>
-              {splitEnabled && (
-                <div className="space-y-3 ml-6">
-                  <input type="hidden" name="partner_user_id" value={partnerUserId ?? ""} />
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Split method</label>
-                    <select name="split_method" value={splitMethod} onChange={e => setSplitMethod(e.target.value as "equal" | "custom" | "covered")} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                      <option value="equal">Equal (50/50)</option>
-                      <option value="custom">Custom percentage</option>
-                      <option value="covered">One person covers</option>
-                    </select>
-                  </div>
-                  {splitMethod === "custom" && (
-                    <div className="space-y-2">
-                      <label htmlFor="your_percent" className="text-sm font-medium">Your share (%)</label>
-                      <input id="your_percent" name="your_percent" type="number" min="0" max="100" defaultValue={50} className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-                    </div>
-                  )}
-                  {splitMethod === "covered" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Who pays?</label>
-                      <select name="payer_user_id" defaultValue={partnerUserId ?? ""} className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                        <option value="">You</option>
-                        <option value={partnerUserId ?? ""}>Partner</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 

@@ -1,17 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PartnerSettings } from "@/components/partner-settings"
+import { getPartnershipId } from "@/lib/queries"
 
 export default async function PartnerSettingsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   let partnership: {
     id: string
@@ -21,18 +18,18 @@ export default async function PartnerSettingsPage() {
   } | null = null
   let members: Array<{ id: string; name: string | null; email: string }> = []
 
-  if (membership) {
+  if (partnershipId) {
     const { data: p } = await supabase
       .from("partnerships")
       .select("id, name, share_code, share_code_expires_at")
-      .eq("id", membership.partnership_id)
+      .eq("id", partnershipId)
       .single()
     partnership = p
 
     const { data: memberRows } = await supabase
       .from("partnership_members")
       .select("user_id")
-      .eq("partnership_id", membership.partnership_id)
+      .eq("partnership_id", partnershipId)
 
     const userIds = memberRows?.map((m) => m.user_id) || []
     if (userIds.length > 0) {

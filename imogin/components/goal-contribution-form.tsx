@@ -1,22 +1,25 @@
-"use client"
+"use client";
 
-import { useActionState } from "react"
-import { addGoalContribution } from "@/lib/actions/goals"
+import { useActionState } from "react";
+import { addGoalContribution } from "@/lib/actions/goals";
 
 interface GoalContributionFormProps {
-  goalId: string
+  goalId: string;
 }
 
 export function GoalContributionForm({ goalId }: GoalContributionFormProps) {
   const [, formAction, pending] = useActionState(
-    (_prev: unknown, formData: FormData) => addGoalContribution(goalId, formData),
-    undefined
-  )
+    (_prev: unknown, formData: FormData) =>
+      addGoalContribution(goalId, formData),
+    undefined,
+  );
 
   return (
     <form action={formAction} className="flex items-end gap-3">
       <div className="flex-1 space-y-2">
-        <label htmlFor="amount" className="text-sm font-medium">Amount</label>
+        <label htmlFor="amount" className="text-sm font-medium">
+          Amount
+        </label>
         <input
           id="amount"
           name="amount"
@@ -28,7 +31,9 @@ export function GoalContributionForm({ goalId }: GoalContributionFormProps) {
         />
       </div>
       <div className="flex-1 space-y-2">
-        <label htmlFor="note" className="text-sm font-medium">Note</label>
+        <label htmlFor="note" className="text-sm font-medium">
+          Note
+        </label>
         <input
           id="note"
           name="note"
@@ -44,5 +49,5 @@ export function GoalContributionForm({ goalId }: GoalContributionFormProps) {
         {pending ? "Adding..." : "Add"}
       </button>
     </form>
-  )
+  );
 }

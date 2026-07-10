@@ -8,7 +8,9 @@ import {
   Frown, Headphones, Key, Landmark, Lightbulb, Map, Monitor,
   Moon, Palette, Phone, Pill, Scissors, Shirt, Smartphone,
   Smile, Sofa, Star, Store, Sun, Train, Trees, Trophy,
-  Tv, Wine, type LucideIcon,
+  Tv, Wine, Coins, TrendingUp, PiggyBank, Building2, Building,
+  Goal, HandCoins, Vault, Handshake, BadgeJapaneseYen,
+  type LucideIcon,
 } from "lucide-react"
 
 const iconMap: Record<string, LucideIcon> = {
@@ -76,6 +78,16 @@ const iconMap: Record<string, LucideIcon> = {
   trophy: Trophy,
   tv: Tv,
   wine: Wine,
+  coins: Coins,
+  "trending-up": TrendingUp,
+  "piggy-bank": PiggyBank,
+  "building-2": Building2,
+  building: Building,
+  goal: Goal,
+  "hand-coins": HandCoins,
+  vault: Vault,
+  handshake: Handshake,
+  "badge-japanese-yen": BadgeJapaneseYen,
 }
 
 export const CATEGORY_ICONS = Object.keys(iconMap)
@@ -85,4 +97,35 @@ export function getCategoryIcon(name: string | null, size = 16): React.ReactNode
   const Icon = iconMap[name]
   if (!Icon) return null
   return <Icon size={size} />
+}
+
+export const ACCOUNT_TYPE_DEFAULT_ICONS: Record<string, string> = {
+  checking: "landmark",
+  savings: "banknote",
+  credit_card: "credit-card",
+  cash: "wallet",
+  investment: "trending-up",
+  other: "coins",
+}
+
+function isIconUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")
+}
+
+export function getAccountIcon(icon: string | null, type: string, size = 20): React.ReactNode {
+  if (!icon) {
+    const defaultIcon = ACCOUNT_TYPE_DEFAULT_ICONS[type] || "wallet"
+    return getCategoryIcon(defaultIcon, size) || getCategoryIcon("wallet", size)
+  }
+
+  if (isIconUrl(icon)) {
+    return <img src={icon} alt="" className="w-5 h-5 rounded object-cover" style={{ width: size, height: size }} />
+  }
+
+  return getCategoryIcon(icon, size) || getCategoryIcon("wallet", size)
+}
+
+export function getTypeIcon(type: string, size = 14): React.ReactNode {
+  const iconName = ACCOUNT_TYPE_DEFAULT_ICONS[type] || "wallet"
+  return getCategoryIcon(iconName, size)
 }

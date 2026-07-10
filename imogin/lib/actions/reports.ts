@@ -2,36 +2,19 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { getPartnershipId, getAccessibleAccountIds } from "@/lib/queries"
 
 export async function getMonthlySpending(year: number, month: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   const firstDay = new Date(year, month - 1, 1).toISOString().split("T")[0]
   const lastDay = new Date(year, month, 0).toISOString().split("T")[0]
 
-  const sharedAccountIds = membership?.partnership_id
-    ? (await supabase
-        .from("accounts")
-        .select("id")
-        .eq("partnership_id", membership.partnership_id)
-        .eq("is_shared", true)).data?.map(a => a.id) || []
-    : []
-
-  const personalAccountIds = (await supabase
-    .from("accounts")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("is_shared", false)).data?.map(a => a.id) || []
-
-  const allIds = [...new Set([...sharedAccountIds, ...personalAccountIds])]
+  const allIds = await getAccessibleAccountIds(supabase, user.id, partnershipId)
   if (allIds.length === 0) return { byCategory: [], totalSpent: 0, totalIncome: 0, byPerson: [] }
 
   const { data: txns } = await supabase
@@ -67,7 +50,7 @@ export async function getMonthlySpending(year: number, month: number) {
   const totalIncome = incomes.reduce((sum, t) => sum + Math.abs(t.amount), 0)
 
   const personMap = new Map<string, number>()
-  if (membership?.partnership_id) {
+  if (partnershipId) {
     for (const t of txns) {
       if (t.transaction_splits && t.transaction_splits.length > 0) {
         for (const split of t.transaction_splits as Array<{ user_id: string; amount: number }>) {

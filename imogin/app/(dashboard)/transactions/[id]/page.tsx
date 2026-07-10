@@ -1,68 +1,165 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { BackLink } from "@/components/back-link"
-import { TransactionEditDialog } from "@/components/transaction-edit-dialog"
-import { TransactionDeleteButton } from "@/components/transaction-delete-button"
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { PageBreadcrumbs } from "@/lib/page-info";
+import { TransactionEditDialog } from "@/components/transaction-edit-dialog";
+import { TransactionDeleteButton } from "@/components/transaction-delete-button";
+import { formatRelativeDate } from "@/lib/dates";
+import { getCategoryIcon } from "@/lib/icons";
+import { getPartnershipId, getPartnerUserId } from "@/lib/queries";
 
 export default async function TransactionDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
 
   const { data: tx, error } = await supabase
     .from("transactions")
-    .select("*, accounts(name, is_shared), categories(name, color)")
+    .select(
+      "*, accounts!account_id(name, is_shared), categories(name, color, icon)",
+    )
     .eq("id", id)
-    .single()
+    .single();
 
   if (error || !tx) {
     return (
       <div className="space-y-6">
-        <BackLink />
         <h1 className="text-2xl font-bold">Transaction not found</h1>
       </div>
+    );
+  }
+
+  const partnershipId = await getPartnershipId(supabase, user.id);
+
+  let categories: Array<{ id: string; name: string; type: string; icon: string | null; color: string | null }> = [];
+  let splits: Array<{
+    id: string;
+    user_id: string;
+    amount: number;
+    percentage: number;
+    settled: boolean;
+    settled_at: string | null;
+    profiles: {
+      name: string | null;
+      email: string;
+      avatar_url: string | null;
+    } | null;
+  }> = [];
+  let partnerUserId: string | null = null;
+  let partnerProfile: {
+    name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null = null;
+  let userProfile: {
+    name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null = null;
+  let forType: "me" | "partner" | "both" = "me";
+
+  const { data: allAccounts } = await supabase
+    .from("accounts")
+    .select("id, name, icon, is_shared")
+    .or(
+      partnershipId
+        ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
+        : `user_id.eq.${user.id}`,
     )
-  }
+    .order("name");
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  let categories: Array<{ id: string; name: string; type: string }> = []
-  if (membership?.partnership_id) {
-    const { data } = await supabase
+  if (partnershipId) {
+    const { data: catData } = await supabase
       .from("categories")
-      .select("id, name, type")
-      .eq("partnership_id", membership.partnership_id)
-    categories = data || []
+      .select("id, name, type, icon, color")
+      .eq("partnership_id", partnershipId);
+    categories = catData || [];
+
+    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id);
+
+    const { data: up } = await supabase
+      .from("profiles")
+      .select("name, email, avatar_url")
+      .eq("id", user.id)
+      .single();
+    userProfile = up;
+
+    if (partnerUserId) {
+      const { data: pp } = await supabase
+        .from("profiles")
+        .select("name, email, avatar_url")
+        .eq("id", partnerUserId)
+        .single();
+      partnerProfile = pp;
+    }
+
+    if (tx.is_split) {
+      const { data: splitData } = await supabase
+        .from("transaction_splits")
+        .select("id, user_id, amount, percentage, settled, settled_at")
+        .eq("transaction_id", id);
+
+      const rawSplits = splitData || [];
+
+      const partnerSplit = rawSplits.find((s) => s.user_id === partnerUserId);
+      const mySplit = rawSplits.find((s) => s.user_id === user.id);
+
+      if (partnerSplit && partnerSplit.percentage === 100) {
+        forType = "partner";
+      } else if (partnerSplit && mySplit && partnerSplit.percentage === 50) {
+        forType = "both";
+      }
+
+      splits = rawSplits.map((s) => ({
+        ...s,
+        profiles: s.user_id === partnerUserId ? partnerProfile : userProfile,
+      })) as typeof splits;
+    }
   }
+
+  const txLabel =
+    tx.description || (tx.type === "transfer" ? "Transfer" : "Transaction");
 
   return (
     <div className="space-y-6">
-      <BackLink />
+      <PageBreadcrumbs
+        items={[
+          { label: "Transactions", href: "/transactions" },
+          { label: txLabel },
+        ]}
+      />
 
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${tx.type === "income" ? "bg-green-500" : tx.type === "transfer" ? "bg-blue-500" : "bg-red-500"}`} />
-            <h1 className="text-2xl font-bold capitalize">{tx.type}</h1>
+            <h1 className="text-xl capitalize">{tx.type}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <TransactionEditDialog transaction={tx} categories={categories || []} />
+            <TransactionEditDialog
+              transaction={tx}
+              accounts={allAccounts || []}
+              categories={categories || []}
+              splits={splits}
+              partnerUserId={partnerUserId}
+              partnershipId={partnershipId}
+              forType={forType}
+              userId={user.id}
+              userProfile={userProfile}
+              partnerProfile={partnerProfile}
+            />
             <TransactionDeleteButton id={tx.id} />
           </div>
         </div>
 
         <p className="text-4xl font-bold mb-6">
-          {tx.type === "income" ? "+" : tx.type === "transfer" ? "↔" : "-"}
-          ¥{Math.abs(tx.amount).toLocaleString()}
+          {tx.type === "income" ? "+" : tx.type === "transfer" ? "↔" : "-"}¥
+          {Math.abs(tx.amount).toLocaleString()}
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -72,15 +169,35 @@ export default async function TransactionDetailPage({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Date</p>
-            <p className="font-medium">{tx.date}</p>
+            <p className="font-medium" title={tx.date}>
+              {formatRelativeDate(tx.date)}
+            </p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Account</p>
-            <p className="font-medium">{tx.accounts?.name || "Unknown"}{tx.accounts?.is_shared ? <span className="text-xs text-primary ml-1">(shared)</span> : null}</p>
+            <p className="font-medium">
+              {tx.accounts?.name || "Unknown"}
+              {tx.accounts?.is_shared ? (
+                <span className="text-xs text-primary ml-1">(shared)</span>
+              ) : null}
+            </p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Category</p>
-            <p className="font-medium">{tx.categories?.name || "—"}</p>
+            {tx.categories ? (
+              <span
+                className="inline-flex items-center gap-1 text-sm px-2 py-0.5 rounded-full"
+                style={{
+                  backgroundColor: (tx.categories.color || "#6B7280") + "18",
+                  color: tx.categories.color || undefined,
+                }}
+              >
+                {tx.categories.icon && getCategoryIcon(tx.categories.icon, 12)}
+                {tx.categories.name}
+              </span>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
           </div>
           {tx.notes && (
             <div className="sm:col-span-2">
@@ -90,6 +207,89 @@ export default async function TransactionDetailPage({
           )}
         </div>
       </div>
+
+      {partnershipId && (
+        <div className="rounded-xl border bg-card p-6">
+          <h2 className="font-semibold mb-4">For</h2>
+          <div className="flex items-center gap-4">
+            {(forType === "me" || forType === "both") && (
+              <div
+                className={`flex flex-col items-center gap-1 p-2 rounded-lg ${forType === "both" ? "bg-accent" : "bg-accent/50"}`}
+              >
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary">
+                  {userProfile?.avatar_url ? (
+                    <img
+                      src={userProfile.avatar_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted text-xs font-medium text-muted-foreground">
+                      {(userProfile?.name || userProfile?.email || "?")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs font-medium">
+                  {userProfile?.name || userProfile?.email || "Me"}
+                </span>
+              </div>
+            )}
+            {(forType === "partner" || forType === "both") && (
+              <div
+                className={`flex flex-col items-center gap-1 p-2 rounded-lg ${forType === "both" ? "bg-accent" : "bg-accent/50"}`}
+              >
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary">
+                  {partnerProfile?.avatar_url ? (
+                    <img
+                      src={partnerProfile.avatar_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted text-xs font-medium text-muted-foreground">
+                      {(partnerProfile?.name || partnerProfile?.email || "?")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs font-medium">
+                  {partnerProfile?.name || partnerProfile?.email || "Partner"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {splits.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {splits.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0 text-sm"
+                >
+                  <span className="text-muted-foreground">{s.percentage}%</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium tabular-nums">
+                      ¥{s.amount.toLocaleString()}
+                    </span>
+                    {s.settled ? (
+                      <span className="text-xs text-green-600 font-medium">
+                        Settled
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-600 font-medium">
+                        Unsettled
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  )
+  );
 }

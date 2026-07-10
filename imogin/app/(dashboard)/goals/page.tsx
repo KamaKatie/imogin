@@ -3,19 +3,14 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { GoalForm } from "@/components/goal-form"
 import { GoalEditDialog } from "@/components/goal-edit-dialog"
+import { getPartnershipId } from "@/lib/queries"
 
 export default async function GoalsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  const partnershipId = membership?.partnership_id || null
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   const { data: goals } = await supabase
     .from("goals")

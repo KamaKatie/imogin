@@ -14,6 +14,7 @@ export function TransactionDeleteButton({ id }: { id: string }) {
     try {
       await deleteTransaction(id)
       router.refresh()
+      router.push("/transactions")
     } catch {
       alert("Failed to delete transaction")
     }

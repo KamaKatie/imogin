@@ -34,6 +34,7 @@ export interface Category {
 export interface Transaction {
   id: string
   account_id: string
+  to_account_id: string | null
   user_id: string
   amount: number
   description: string | null
