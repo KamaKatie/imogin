@@ -6,13 +6,13 @@ const routeTitles: Record<string, string> = {
   "/": "Dashboard",
   "/transactions": "Transactions",
   "/accounts": "Accounts",
-  "/subscriptions": "Subscriptions",
+  "/bills": "Bills",
   "/goals": "Goals",
   "/budgets": "Budgets",
   "/reports": "Reports",
   "/settings": "Settings",
   "/settings/categories": "Categories",
-  "/subscriptions/calendar": "Subscription Calendar",
+  "/bills/calendar": "Bills Calendar",
 }
 
 export function TopBar() {

@@ -45,6 +45,7 @@ export interface Transaction {
   split_method: SplitMethod | null
   notes: string | null
   receipt_url: string | null
+  bill_id: string | null
   created_at: string
   updated_at: string
 }
@@ -60,28 +61,30 @@ export interface TransactionSplit {
   created_at: string
 }
 
-export interface Subscription {
+export interface Bill {
   id: string
   partnership_id: string
   name: string
-  description: string | null
   amount: number
   currency: string
   billing_cycle: BillingCycle
   next_billing_date: string
+  due_day: number | null
   category_id: string | null
   payment_account_id: string | null
   split_method: SplitMethod
   split_payer_user_id: string | null
+  icon_url: string | null
+  url: string | null
   created_by: string
   active: boolean
   created_at: string
   updated_at: string
 }
 
-export interface SubscriptionSplit {
+export interface BillSplit {
   id: string
-  subscription_id: string
+  bill_id: string
   user_id: string
   percentage: number
 }

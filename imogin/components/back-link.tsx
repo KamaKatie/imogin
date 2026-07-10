@@ -7,7 +7,7 @@ const parentLabels: Record<string, string> = {
   "/accounts": "accounts",
   "/transactions": "transactions",
   "/goals": "goals",
-  "/subscriptions": "subscriptions",
+  "/bills": "bills",
   "/settings": "settings",
   "/budgets": "budgets",
   "/reports": "reports",

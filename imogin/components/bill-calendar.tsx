@@ -1,14 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import type { Subscription } from "@/lib/supabase/types-extension"
+import type { Bill } from "@/lib/supabase/types-extension"
 
-interface SubWithCategory extends Subscription {
+interface BillWithCategory extends Bill {
   categories: { name: string; color: string | null } | null
 }
 
-interface SubscriptionCalendarProps {
-  subscriptions: SubWithCategory[]
+interface BillCalendarProps {
+  bills: BillWithCategory[]
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -19,7 +19,7 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay()
 }
 
-export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProps) {
+export function BillCalendar({ bills }: BillCalendarProps) {
   const now = new Date()
   const [currentMonth, setCurrentMonth] = useState(now.getMonth())
   const [currentYear, setCurrentYear] = useState(now.getFullYear())
@@ -49,25 +49,25 @@ export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProp
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
 
-  const subscriptionsByDate: Record<number, SubWithCategory[]> = {}
+  const billsByDate: Record<number, BillWithCategory[]> = {}
   for (let day = 1; day <= daysInMonth; day++) {
-    subscriptionsByDate[day] = []
+    billsByDate[day] = []
   }
 
-  for (const sub of subscriptions) {
-    const billDate = new Date(sub.next_billing_date)
+  for (const bill of bills) {
+    const billDate = new Date(bill.next_billing_date)
     if (billDate.getMonth() === currentMonth && billDate.getFullYear() === currentYear) {
       const day = billDate.getDate()
-      if (subscriptionsByDate[day]) {
-        subscriptionsByDate[day].push(sub)
+      if (billsByDate[day]) {
+        billsByDate[day].push(bill)
       }
     }
 
-    if (sub.billing_cycle === "monthly") {
+    if (bill.billing_cycle === "monthly") {
       const startDay = billDate.getDate()
       if (startDay >= 1 && startDay <= daysInMonth) {
-        if (subscriptionsByDate[startDay] && !subscriptionsByDate[startDay].find(s => s.id === sub.id)) {
-          subscriptionsByDate[startDay].push(sub)
+        if (billsByDate[startDay] && !billsByDate[startDay].find(s => s.id === bill.id)) {
+          billsByDate[startDay].push(bill)
         }
       }
     }
@@ -108,7 +108,7 @@ export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProp
           const day = i + 1
           const dateStr = `${currentYear}-${currentMonth}-${day}`
           const isToday = dateStr === todayStr
-          const daySubs = subscriptionsByDate[day] || []
+          const dayBills = billsByDate[day] || []
 
           return (
             <div
@@ -119,17 +119,17 @@ export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProp
                 {day}
               </div>
               <div className="space-y-1">
-                {daySubs.map((sub) => (
+                {dayBills.map((bill) => (
                   <div
-                    key={sub.id}
+                    key={bill.id}
                     className="text-xs rounded px-1 py-0.5 truncate font-medium"
                     style={{
-                      backgroundColor: (sub.categories?.color || "#4F46E5") + "20",
-                      color: sub.categories?.color || "#4F46E5",
+                      backgroundColor: (bill.categories?.color || "#4F46E5") + "20",
+                      color: bill.categories?.color || "#4F46E5",
                     }}
-                    title={`${sub.name} - $${sub.amount.toFixed(2)}`}
+                    title={`${bill.name} - ¥${Math.abs(bill.amount).toLocaleString()}`}
                   >
-                    {sub.name}
+                    {bill.name}
                   </div>
                 ))}
               </div>
@@ -142,13 +142,13 @@ export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProp
         <h3 className="text-sm font-semibold mb-2">Monthly Summary</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">Total subscriptions</p>
-            <p className="text-lg font-bold">{subscriptions.length}</p>
+            <p className="text-xs text-muted-foreground">Total bills</p>
+            <p className="text-lg font-bold">{bills.length}</p>
           </div>
           <div className="rounded-lg border p-3">
             <p className="text-xs text-muted-foreground">Monthly total</p>
             <p className="text-lg font-bold">
-              ${subscriptions.reduce((sum, s) => {
+              ¥{bills.reduce((sum, s) => {
                 const amt = Math.abs(s.amount)
                 switch (s.billing_cycle) {
                   case "weekly": return sum + amt * 4.33
@@ -157,7 +157,7 @@ export function SubscriptionCalendar({ subscriptions }: SubscriptionCalendarProp
                   case "yearly": return sum + amt / 12
                   default: return sum
                 }
-              }, 0).toFixed(2)}
+              }, 0).toLocaleString()}
             </p>
           </div>
         </div>

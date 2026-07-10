@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { SubscriptionCalendar } from "@/components/subscription-calendar"
+import { BillCalendar } from "@/components/bill-calendar"
 
-export default async function SubscriptionCalendarPage() {
+export default async function BillCalendarPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -14,10 +14,10 @@ export default async function SubscriptionCalendarPage() {
     .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
     .single()
 
-  if (!partnership) redirect("/subscriptions")
+  if (!partnership) redirect("/bills")
 
-  const { data: subscriptions } = await supabase
-    .from("subscriptions")
+  const { data: bills } = await supabase
+    .from("bills")
     .select(`
       *,
       categories(name, color)
@@ -31,14 +31,14 @@ export default async function SubscriptionCalendarPage() {
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground">View upcoming bills on a calendar</p>
         <Link
-          href="/subscriptions"
+          href="/bills"
           className="inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent"
         >
           List View
         </Link>
       </div>
 
-      <SubscriptionCalendar subscriptions={subscriptions || []} />
+      <BillCalendar bills={bills || []} />
     </div>
   )
 }

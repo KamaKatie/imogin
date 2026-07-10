@@ -32,7 +32,7 @@ interface AccountItem {
 }
 
 const planningItems = [
-  { href: "/subscriptions", label: "Subscriptions", icon: "Repeat" },
+  { href: "/bills", label: "Bills", icon: "Repeat" },
   { href: "/goals", label: "Goals", icon: "Target" },
   { href: "/budgets", label: "Budgets", icon: "PieChart" },
   { href: "/reports", label: "Reports", icon: "BarChart3" },

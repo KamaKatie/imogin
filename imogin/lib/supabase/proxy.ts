@@ -42,6 +42,13 @@ export async function updateSession(request: NextRequest) {
   // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
+  // Redirect old /subscriptions paths to /bills
+  if (request.nextUrl.pathname.startsWith("/subscriptions")) {
+    const url = request.nextUrl.clone();
+    url.pathname = url.pathname.replace(/^\/subscriptions/, "/bills");
+    return NextResponse.redirect(url);
+  }
+
   // IMPORTANT: If you remove getClaims() and you use server-side rendering
   // with the Supabase client, your users may be randomly logged out.
   const { data } = await supabase.auth.getClaims();

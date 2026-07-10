@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 
+function getOrdinal(n: number) {
+  if (n > 3 && n < 21) return "th"
+  switch (n % 10) { case 1: return "st"; case 2: return "nd"; case 3: return "rd"; default: return "th" }
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,7 +36,7 @@ export default async function DashboardPage() {
 
   let sharedAccounts: unknown[] = []
   let goals: unknown[] = []
-  let subscriptions: unknown[] = []
+  let bills: unknown[] = []
   let recentTransactions: unknown[] = []
 
   const personalBalance = personalAccounts?.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
@@ -74,19 +79,19 @@ export default async function DashboardPage() {
       .eq("status", "active")
     goals = goalsResult.data || []
 
-    const subsResult = await supabase
-      .from("subscriptions")
-      .select("*")
+    const billsResult = await supabase
+      .from("bills")
+      .select("*, categories(name, color)")
       .eq("partnership_id", partnershipId)
       .eq("active", true)
-    subscriptions = subsResult.data || []
+    bills = billsResult.data || []
   }
 
   const { data: recentTxnData } = await txnQuery
   recentTransactions = recentTxnData || []
 
   const sharedBalance = (sharedAccounts as Array<{ balance: number }>)?.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
-  const upcomingSubsAmount = (subscriptions as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0
+  const upcomingBillsAmount = (bills as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0
 
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
@@ -168,9 +173,53 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground">Active Goals</p>
           <p className="text-2xl font-bold mt-1">{goals.length}</p>
         </div>
-        <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Upcoming Subs</p>
-          <p className="text-2xl font-bold mt-1">¥{upcomingSubsAmount.toLocaleString()}/mo</p>
+        <div className="rounded-xl border bg-card p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">Upcoming Bills</p>
+            <Link href="/bills" className="text-xs text-primary hover:underline">Manage</Link>
+          </div>
+          <p className="text-2xl font-bold">¥{upcomingBillsAmount.toLocaleString()}/mo</p>
+          {bills.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {(bills as Array<{ id: string; name: string; amount: number; next_billing_date: string; billing_cycle: string; due_day: number | null; categories: { name: string; color: string | null } | null }>)
+                .filter((s) => {
+                  const due = new Date(s.next_billing_date)
+                  const now = new Date()
+                  return due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear()
+                })
+                .map((s) => {
+                  const day = s.due_day || new Date(s.next_billing_date).getDate()
+                  const isOverdue = new Date(s.next_billing_date) < new Date()
+                  return (
+                    <div key={s.id} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOverdue ? "bg-red-500" : "bg-blue-500"}`} />
+                        <span className="text-sm truncate">{s.name}</span>
+                        {s.categories && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ backgroundColor: s.categories.color || "#6B7280" }} />
+                            {s.categories.name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className="text-sm font-medium">¥{Math.abs(s.amount).toLocaleString()}</span>
+                        <span className={`text-xs ml-2 ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
+                          {isOverdue ? "Overdue" : `${day}${getOrdinal(day)}`}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+          {(bills as Array<{ next_billing_date: string }>).filter((s) => {
+            const due = new Date(s.next_billing_date)
+            const now = new Date()
+            return due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear()
+          }).length === 0 && (
+            <p className="text-xs text-muted-foreground mt-3">No bills due this month</p>
+          )}
         </div>
       </div>
 
@@ -351,25 +400,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {subscriptions.length > 0 && (
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Upcoming Subscriptions</h2>
-            <Link href="/subscriptions" className="text-sm text-primary hover:underline">View all</Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(subscriptions as Array<{ id: string; name: string; amount: number; next_billing_date: string; billing_cycle: string }>).map((s) => (
-              <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{s.name}</p>
-                  <p className="text-xs text-muted-foreground">Due {s.next_billing_date} &middot; {s.billing_cycle}</p>
-                </div>
-                <p className="text-sm font-medium">¥{Math.abs(s.amount).toLocaleString()}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

@@ -333,36 +333,36 @@ export type Database = {
         }
         Relationships: []
       }
-      subscription_splits: {
+      bill_splits: {
         Row: {
           id: string
           percentage: number
-          subscription_id: string
+          bill_id: string
           user_id: string
         }
         Insert: {
           id?: string
           percentage: number
-          subscription_id: string
+          bill_id: string
           user_id: string
         }
         Update: {
           id?: string
           percentage?: number
-          subscription_id?: string
+          bill_id?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "subscription_splits_subscription_id_fkey"
-            columns: ["subscription_id"]
+            columns: ["bill_id"]
             isOneToOne: false
-            referencedRelation: "subscriptions"
+            referencedRelation: "bills"
             referencedColumns: ["id"]
           },
         ]
       }
-      subscriptions: {
+      bills: {
         Row: {
           active: boolean
           amount: number
@@ -371,7 +371,8 @@ export type Database = {
           created_at: string
           created_by: string
           currency: string
-          description: string | null
+          due_day: number | null
+          icon_url: string | null
           id: string
           name: string
           next_billing_date: string
@@ -380,6 +381,7 @@ export type Database = {
           split_method: string
           split_payer_user_id: string | null
           updated_at: string
+          url: string | null
         }
         Insert: {
           active?: boolean
@@ -389,7 +391,8 @@ export type Database = {
           created_at?: string
           created_by: string
           currency?: string
-          description?: string | null
+          due_day?: number | null
+          icon_url?: string | null
           id?: string
           name: string
           next_billing_date: string
@@ -398,6 +401,7 @@ export type Database = {
           split_method?: string
           split_payer_user_id?: string | null
           updated_at?: string
+          url?: string | null
         }
         Update: {
           active?: boolean
@@ -407,7 +411,8 @@ export type Database = {
           created_at?: string
           created_by?: string
           currency?: string
-          description?: string | null
+          due_day?: number | null
+          icon_url?: string | null
           id?: string
           name?: string
           next_billing_date?: string
@@ -416,6 +421,7 @@ export type Database = {
           split_method?: string
           split_payer_user_id?: string | null
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {
@@ -486,6 +492,7 @@ export type Database = {
         Row: {
           account_id: string
           amount: number
+          bill_id: string | null
           category_id: string | null
           created_at: string
           date: string
@@ -504,6 +511,7 @@ export type Database = {
         Insert: {
           account_id: string
           amount: number
+          bill_id?: string | null
           category_id?: string | null
           created_at?: string
           date: string
@@ -522,6 +530,7 @@ export type Database = {
         Update: {
           account_id?: string
           amount?: number
+          bill_id?: string | null
           category_id?: string | null
           created_at?: string
           date?: string
