@@ -10,13 +10,13 @@ export default async function TransactionsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id, user2_id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single();
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  const partnershipId = partnership?.id || null;
+  const partnershipId = membership?.partnership_id || null;
 
   const { data: accounts } = await supabase
     .from("accounts")
@@ -90,7 +90,14 @@ export default async function TransactionsPage() {
     allTxns = data || [];
   }
 
-  const partnerUserId = partnership?.user2_id || null;
+  let partnerUserId: string | null = null;
+  if (partnershipId) {
+    const { data: memberRows } = await supabase
+      .from("partnership_members")
+      .select("user_id")
+      .eq("partnership_id", partnershipId)
+    partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
+  }
 
   return (
     <div className="space-y-6">

@@ -8,20 +8,20 @@ export async function getMonthlySpending(year: number, month: number) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
   const firstDay = new Date(year, month - 1, 1).toISOString().split("T")[0]
   const lastDay = new Date(year, month, 0).toISOString().split("T")[0]
 
-  const sharedAccountIds = partnership?.id
+  const sharedAccountIds = membership?.partnership_id
     ? (await supabase
         .from("accounts")
         .select("id")
-        .eq("partnership_id", partnership.id)
+        .eq("partnership_id", membership.partnership_id)
         .eq("is_shared", true)).data?.map(a => a.id) || []
     : []
 
@@ -67,7 +67,7 @@ export async function getMonthlySpending(year: number, month: number) {
   const totalIncome = incomes.reduce((sum, t) => sum + Math.abs(t.amount), 0)
 
   const personMap = new Map<string, number>()
-  if (partnership) {
+  if (membership?.partnership_id) {
     for (const t of txns) {
       if (t.transaction_splits && t.transaction_splits.length > 0) {
         for (const split of t.transaction_splits as Array<{ user_id: string; amount: number }>) {

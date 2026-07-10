@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BillingCycle, SplitMethod } from "@/lib/supabase/types-extension"
+import { getPartnershipId } from "@/lib/queries"
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -56,16 +57,6 @@ function calculateNextBillingDate(dueDay: number, billingCycle: BillingCycle): s
       return candidate.toISOString().split("T")[0]
     }
   }
-}
-
-async function getPartnershipId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-    .single()
-
-  return data?.id || null
 }
 
 export async function getBills() {
@@ -138,24 +129,28 @@ export async function getBillWithDetails(id: string) {
     .eq("bill_id", id)
     .order("date", { ascending: false })
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("user1_id, user2_id")
-    .eq("id", partnershipId)
-    .single()
+  const { data: memberRows } = await supabase
+    .from("partnership_members")
+    .select("user_id")
+    .eq("partnership_id", partnershipId)
 
   let partnerProfile: { name: string | null } | null = null
-  if (partnership) {
-    const partnerUserId = partnership.user1_id === user.id ? partnership.user2_id : partnership.user1_id
-    if (partnerUserId) {
-      const { data: pp } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", partnerUserId)
-        .single()
-      partnerProfile = pp
-    }
+  const otherUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id
+  if (otherUserId) {
+    const { data: pp } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", otherUserId)
+      .single()
+    partnerProfile = pp
   }
+
+  const partnership = await supabase
+    .from("partnerships")
+    .select("id")
+    .eq("id", partnershipId)
+    .single()
+    .then((r) => r.data)
 
   return { bill, transactions: transactions || [], partnership, partnerProfile }
 }

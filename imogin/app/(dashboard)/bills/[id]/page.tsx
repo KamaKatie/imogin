@@ -13,13 +13,15 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id, user1_id, user2_id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  if (!partnership) redirect("/bills")
+  if (!membership) redirect("/bills")
+
+  const partnershipId = membership.partnership_id
 
   const { data: bill, error } = await supabase
     .from("bills")
@@ -30,12 +32,16 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
       bill_splits(user_id, percentage)
     `)
     .eq("id", id)
-    .eq("partnership_id", partnership.id)
+    .eq("partnership_id", partnershipId)
     .single()
 
   if (error || !bill) redirect("/bills")
 
-  const partnerUserId = partnership.user1_id === user.id ? partnership.user2_id : partnership.user1_id
+  const { data: memberRows } = await supabase
+    .from("partnership_members")
+    .select("user_id")
+    .eq("partnership_id", partnershipId)
+  const partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
 
   let partnerName: string | null = null
   if (partnerUserId) {

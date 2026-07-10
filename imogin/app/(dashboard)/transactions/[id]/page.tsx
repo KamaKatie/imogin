@@ -29,25 +29,20 @@ export default async function TransactionDetailPage({
     )
   }
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
-
-  let catQuery = supabase
-    .from("categories")
-    .select("id, name, type")
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
     .eq("user_id", user.id)
+    .maybeSingle()
 
-  if (partnership?.id) {
-    catQuery = supabase
+  let categories: Array<{ id: string; name: string; type: string }> = []
+  if (membership?.partnership_id) {
+    const { data } = await supabase
       .from("categories")
       .select("id, name, type")
-      .or(`user_id.eq.${user.id},partnership_id.eq.${partnership.id}`)
+      .eq("partnership_id", membership.partnership_id)
+    categories = data || []
   }
-
-  const { data: categories } = await catQuery
 
   return (
     <div className="space-y-6">

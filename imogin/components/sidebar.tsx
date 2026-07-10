@@ -8,13 +8,12 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { getPartnershipId } from "@/lib/queries";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -179,13 +178,7 @@ export function Sidebar() {
         setFullName(profile?.name || profile?.email || user.email || "");
       })
 
-      supabase
-        .from("partnerships")
-        .select("id")
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-        .single()
-        .then(({ data: partnership }) => {
-          const partnershipId = partnership?.id || null
+      getPartnershipId(supabase, user.id).then((partnershipId) => {
           const q = supabase
             .from("accounts")
             .select("id, name, balance")
@@ -212,7 +205,8 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-card border-r flex flex-col z-40">
       <div className="p-5">
-        <Link href="/" className="text-xl font-bold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <img src="/logo.png" alt="Imogin" className="w-6 h-6 rounded-md" />
           IMOGIN
         </Link>
       </div>
@@ -321,12 +315,6 @@ export function Sidebar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col">
-                <span className="font-medium">{fullName || "Account"}</span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
                 <Settings size={16} />
@@ -350,7 +338,6 @@ export function Sidebar() {
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer">
               <LogOut size={16} />
               Sign out

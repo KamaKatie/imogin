@@ -8,13 +8,15 @@ export default async function BillCalendarPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  if (!partnership) redirect("/bills")
+  if (!membership) redirect("/bills")
+
+  const partnershipId = membership.partnership_id
 
   const { data: bills } = await supabase
     .from("bills")
@@ -22,7 +24,7 @@ export default async function BillCalendarPage() {
       *,
       categories(name, color)
     `)
-    .eq("partnership_id", partnership.id)
+    .eq("partnership_id", partnershipId)
     .eq("active", true)
     .order("next_billing_date")
 

@@ -3,16 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BudgetPeriod } from "@/lib/supabase/types-extension"
-
-async function getPartnershipId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-    .single()
-
-  return data?.id || null
-}
+import { getPartnershipId } from "@/lib/queries"
 
 export async function getBudgets() {
   const supabase = await createClient()

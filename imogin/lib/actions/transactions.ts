@@ -9,15 +9,15 @@ export async function getTransactions(accountId?: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
   let query
 
-  if (partnership?.id) {
+  if (membership?.partnership_id) {
     query = supabase
       .from("transactions")
       .select(`
@@ -28,7 +28,7 @@ export async function getTransactions(accountId?: string) {
       `)
       .or(
         `user_id.eq.${user.id},and(account_id.in.(
-          select id from accounts where partnership_id.eq.${partnership.id}
+          select id from accounts where partnership_id.eq.${membership.partnership_id}
         ))`
       )
   } else {

@@ -7,13 +7,13 @@ export default async function BudgetsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  const partnershipId = partnership?.id || null
+  const partnershipId = membership?.partnership_id || null
 
   const { data: categories } = partnershipId ? await supabase
     .from("categories")

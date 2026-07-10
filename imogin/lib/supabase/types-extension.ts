@@ -4,7 +4,7 @@ export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 export type GoalStatus = 'active' | 'completed' | 'cancelled'
 export type BudgetPeriod = 'weekly' | 'monthly' | 'yearly'
 export type TransactionType = 'income' | 'expense' | 'transfer'
-export type CategoryType = 'income' | 'expense'
+export type CategoryType = 'income' | 'expense' | 'transfer'
 
 export interface Account {
   id: string
@@ -133,10 +133,16 @@ export interface Budget {
 
 export interface Partnership {
   id: string
-  user1_id: string
-  user2_id: string | null
+  name: string | null
   share_code: string | null
   share_code_expires_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface PartnershipMember {
+  id: string
+  partnership_id: string
+  user_id: string
+  joined_at: string
 }

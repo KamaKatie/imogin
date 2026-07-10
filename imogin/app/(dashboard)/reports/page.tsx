@@ -1,19 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { ReportCharts } from "@/components/report-charts"
+import { getPartnershipId } from "@/lib/queries"
 
 export default async function ReportsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
-
-  const partnershipId = partnership?.id || null
+  const partnershipId = await getPartnershipId(supabase, user.id)
 
   const now = new Date()
   const year = now.getFullYear()

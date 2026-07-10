@@ -20,13 +20,23 @@ export default async function DashboardPage() {
 
   const displayName = profile?.name || profile?.email || user.email
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id, share_code, user2_id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  const partnershipId = partnership?.id || null
+  const partnershipId = membership?.partnership_id || null
+
+  let shareCode: string | null = null
+  if (partnershipId) {
+    const { data: p } = await supabase
+      .from("partnerships")
+      .select("share_code")
+      .eq("id", partnershipId)
+      .single()
+    shareCode = p?.share_code || null
+  }
 
   const { data: personalAccounts } = await supabase
     .from("accounts")
@@ -144,13 +154,21 @@ export default async function DashboardPage() {
       budgets = budgetsResult.data || []
     }
 
-    if (partnership?.user2_id) {
-      const partnerResult = await supabase
-        .from("profiles")
-        .select("name, email")
-        .eq("id", partnership.user2_id)
-        .single()
-      partnerProfile = partnerResult.data
+    if (partnershipId) {
+      const { data: memberRows } = await supabase
+        .from("partnership_members")
+        .select("user_id")
+        .eq("partnership_id", partnershipId)
+
+      const otherUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id
+      if (otherUserId) {
+        const partnerResult = await supabase
+          .from("profiles")
+          .select("name, email")
+          .eq("id", otherUserId)
+          .single()
+        partnerProfile = partnerResult.data
+      }
     }
   }
 
@@ -267,10 +285,10 @@ export default async function DashboardPage() {
                   <p className="font-medium">You have a partnership</p>
                 </div>
               )}
-              {partnership?.share_code && (
+              {shareCode && (
                 <div>
                   <p className="text-sm text-muted-foreground">Share Code</p>
-                  <p className="font-mono text-sm font-medium">{partnership.share_code}</p>
+                  <p className="font-mono text-sm font-medium">{shareCode}</p>
                 </div>
               )}
             </div>

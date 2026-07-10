@@ -67,6 +67,123 @@ export type Database = {
           },
         ]
       }
+      bill_splits: {
+        Row: {
+          bill_id: string
+          id: string
+          percentage: number
+          user_id: string
+        }
+        Insert: {
+          bill_id: string
+          id?: string
+          percentage: number
+          user_id: string
+        }
+        Update: {
+          bill_id?: string
+          id?: string
+          percentage?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_splits_subscription_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          active: boolean
+          amount: number
+          billing_cycle: string
+          category_id: string | null
+          created_at: string
+          created_by: string
+          currency: string
+          description: string | null
+          due_day: number | null
+          icon_url: string | null
+          id: string
+          name: string
+          next_billing_date: string
+          partnership_id: string
+          payment_account_id: string | null
+          split_method: string
+          split_payer_user_id: string | null
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          billing_cycle: string
+          category_id?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string
+          description?: string | null
+          due_day?: number | null
+          icon_url?: string | null
+          id?: string
+          name: string
+          next_billing_date: string
+          partnership_id: string
+          payment_account_id?: string | null
+          split_method?: string
+          split_payer_user_id?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          billing_cycle?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string | null
+          due_day?: number | null
+          icon_url?: string | null
+          id?: string
+          name?: string
+          next_billing_date?: string
+          partnership_id?: string
+          payment_account_id?: string | null
+          split_method?: string
+          split_payer_user_id?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           amount: number
@@ -276,33 +393,59 @@ export type Database = {
           },
         ]
       }
+      partnership_members: {
+        Row: {
+          id: string
+          joined_at: string
+          partnership_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          partnership_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          partnership_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_members_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnerships: {
         Row: {
           created_at: string
           id: string
+          name: string | null
           share_code: string | null
           share_code_expires_at: string | null
           updated_at: string
-          user1_id: string
-          user2_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          name?: string | null
           share_code?: string | null
           share_code_expires_at?: string | null
           updated_at?: string
-          user1_id: string
-          user2_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          name?: string | null
           share_code?: string | null
           share_code_expires_at?: string | null
           updated_at?: string
-          user1_id?: string
-          user2_id?: string | null
         }
         Relationships: []
       }
@@ -332,120 +475,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      bill_splits: {
-        Row: {
-          id: string
-          percentage: number
-          bill_id: string
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          percentage: number
-          bill_id: string
-          user_id: string
-        }
-        Update: {
-          id?: string
-          percentage?: number
-          bill_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_splits_subscription_id_fkey"
-            columns: ["bill_id"]
-            isOneToOne: false
-            referencedRelation: "bills"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bills: {
-        Row: {
-          active: boolean
-          amount: number
-          billing_cycle: string
-          category_id: string | null
-          created_at: string
-          created_by: string
-          currency: string
-          due_day: number | null
-          icon_url: string | null
-          id: string
-          name: string
-          next_billing_date: string
-          partnership_id: string
-          payment_account_id: string | null
-          split_method: string
-          split_payer_user_id: string | null
-          updated_at: string
-          url: string | null
-        }
-        Insert: {
-          active?: boolean
-          amount: number
-          billing_cycle: string
-          category_id?: string | null
-          created_at?: string
-          created_by: string
-          currency?: string
-          due_day?: number | null
-          icon_url?: string | null
-          id?: string
-          name: string
-          next_billing_date: string
-          partnership_id: string
-          payment_account_id?: string | null
-          split_method?: string
-          split_payer_user_id?: string | null
-          updated_at?: string
-          url?: string | null
-        }
-        Update: {
-          active?: boolean
-          amount?: number
-          billing_cycle?: string
-          category_id?: string | null
-          created_at?: string
-          created_by?: string
-          currency?: string
-          due_day?: number | null
-          icon_url?: string | null
-          id?: string
-          name?: string
-          next_billing_date?: string
-          partnership_id?: string
-          payment_account_id?: string | null
-          split_method?: string
-          split_payer_user_id?: string | null
-          updated_at?: string
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_partnership_id_fkey"
-            columns: ["partnership_id"]
-            isOneToOne: false
-            referencedRelation: "partnerships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_payment_account_id_fkey"
-            columns: ["payment_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       transaction_splits: {
         Row: {
@@ -552,6 +581,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
             referencedColumns: ["id"]
           },
           {

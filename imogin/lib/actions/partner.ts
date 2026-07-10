@@ -9,27 +9,40 @@ export async function getPartnership() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!membership) return null
+
+  const partnershipId = membership.partnership_id
+
   const { data: partnership } = await supabase
     .from("partnerships")
     .select("*")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+    .eq("id", partnershipId)
     .single()
 
   if (!partnership) return null
 
-  const partnerId = partnership.user1_id === user.id ? partnership.user2_id : partnership.user1_id
+  const { data: memberRows } = await supabase
+    .from("partnership_members")
+    .select("user_id, joined_at")
+    .eq("partnership_id", partnershipId)
 
-  let partner: { name: string | null; email: string } | null = null
-  if (partnerId) {
-    const { data: profile } = await supabase
+  const userIds = memberRows?.map((m) => m.user_id) || []
+  let profiles: Array<{ id: string; name: string | null; email: string }> = []
+  if (userIds.length > 0) {
+    const { data: p } = await supabase
       .from("profiles")
-      .select("name, email")
-      .eq("id", partnerId)
-      .single()
-    partner = profile
+      .select("id, name, email")
+      .in("id", userIds)
+    profiles = p || []
   }
 
-  return { partnership, partner }
+  return { partnership, members: profiles }
 }
 
 export async function createPartnership() {
@@ -38,10 +51,10 @@ export async function createPartnership() {
   if (!user) redirect("/auth/login")
 
   const { data: existing } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
   if (existing) throw new Error("Already in a partnership")
 
@@ -51,11 +64,15 @@ export async function createPartnership() {
 
   const { error } = await supabase
     .from("partnerships")
-    .insert({ id: partnershipId, user1_id: user.id, share_code: code, share_code_expires_at: expiresAt })
+    .insert({ id: partnershipId, share_code: code, share_code_expires_at: expiresAt })
 
   if (error) throw new Error(error.message)
 
-  await supabase.rpc("seed_default_categories", { target_partnership_id: partnershipId })
+  const { error: memberError } = await supabase
+    .from("partnership_members")
+    .insert({ partnership_id: partnershipId, user_id: user.id })
+
+  if (memberError) throw new Error(memberError.message)
 
   return code
 }
@@ -66,10 +83,10 @@ export async function joinPartnership(formData: FormData) {
   if (!user) redirect("/auth/login")
 
   const { data: existing } = await supabase
-    .from("partnerships")
-    .select("id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
   if (existing) throw new Error("Already in a partnership")
 
@@ -85,12 +102,12 @@ export async function joinPartnership(formData: FormData) {
   if (partnership.share_code_expires_at && new Date(partnership.share_code_expires_at) < new Date()) {
     throw new Error("Share code has expired")
   }
-  if (partnership.user2_id) throw new Error("Partnership is full")
 
-  await supabase
-    .from("partnerships")
-    .update({ user2_id: user.id, share_code: null, share_code_expires_at: null })
-    .eq("id", partnership.id)
+  const { error: memberError } = await supabase
+    .from("partnership_members")
+    .insert({ partnership_id: partnership.id, user_id: user.id })
+
+  if (memberError) throw new Error(memberError.message)
 
   return { success: true }
 }
@@ -100,28 +117,80 @@ export async function leavePartnership() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("*")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  if (!partnership) return
+  if (!membership) return
 
-  if (partnership.user1_id === user.id && partnership.user2_id) {
-    await supabase
-      .from("partnerships")
-      .update({ user1_id: partnership.user2_id, user2_id: null })
-      .eq("id", partnership.id)
-  } else if (partnership.user1_id === user.id) {
-    await supabase.from("partnerships").delete().eq("id", partnership.id)
-  } else {
-    await supabase
-      .from("partnerships")
-      .update({ user2_id: null })
-      .eq("id", partnership.id)
+  const partnershipId = membership.partnership_id
+
+  await supabase
+    .from("partnership_members")
+    .delete()
+    .eq("user_id", user.id)
+
+  const { count } = await supabase
+    .from("partnership_members")
+    .select("*", { count: "exact", head: true })
+    .eq("partnership_id", partnershipId)
+
+  if (count === 0) {
+    await supabase.from("categories").delete().eq("partnership_id", partnershipId)
+    await supabase.from("bills").delete().eq("partnership_id", partnershipId)
+    await supabase.from("partnerships").delete().eq("id", partnershipId)
   }
 
   return { success: true }
 }
 
+export async function updatePartnershipName(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!membership) throw new Error("No partnership found")
+
+  const name = formData.get("name") as string
+
+  const { error } = await supabase
+    .from("partnerships")
+    .update({ name })
+    .eq("id", membership.partnership_id)
+
+  if (error) throw new Error(error.message)
+}
+
+export async function regenerateShareCode() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!membership) throw new Error("No partnership found")
+
+  const code = crypto.randomBytes(3).toString("hex").toUpperCase()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+  const { error } = await supabase
+    .from("partnerships")
+    .update({ share_code: code, share_code_expires_at: expiresAt })
+    .eq("id", membership.partnership_id)
+
+  if (error) throw new Error(error.message)
+
+  return code
+}

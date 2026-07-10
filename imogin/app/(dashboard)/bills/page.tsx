@@ -20,31 +20,31 @@ export default async function BillsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("id, user1_id, user2_id")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .single()
+  const { data: membership } = await supabase
+    .from("partnership_members")
+    .select("partnership_id")
+    .eq("user_id", user.id)
+    .maybeSingle()
 
-  const partnershipId = partnership?.id || null
+  const partnershipId = membership?.partnership_id || null
 
   let accounts: Array<{ id: string; name: string; is_shared: boolean }> = []
   let partnerName: string | null = null
   let partnerUserId: string | null = null
   let categories: Array<{ id: string; name: string; type: string; color: string | null; icon: string | null }> = []
 
-  if (partnership) {
+  if (partnershipId) {
     const { data: catData } = await supabase
       .from("categories")
       .select("*")
-      .eq("partnership_id", partnership.id)
+      .eq("partnership_id", partnershipId)
       .eq("type", "expense")
     categories = catData || []
 
     const { data: shared } = await supabase
       .from("accounts")
       .select("id, name, is_shared")
-      .eq("partnership_id", partnership.id)
+      .eq("partnership_id", partnershipId)
       .eq("is_shared", true)
 
     const { data: personal } = await supabase
@@ -54,7 +54,11 @@ export default async function BillsPage() {
 
     accounts = [...(personal || []), ...(shared || [])]
 
-    partnerUserId = partnership.user1_id === user.id ? partnership.user2_id : partnership.user1_id
+    const { data: memberRows } = await supabase
+      .from("partnership_members")
+      .select("user_id")
+      .eq("partnership_id", partnershipId)
+    partnerUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id || null
     if (partnerUserId) {
       const { data: profile } = await supabase
         .from("profiles")
