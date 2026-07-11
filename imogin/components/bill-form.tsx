@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { calculatePreviewDate, getOrdinal } from "@/lib/dates";
+import { calculatePreviewDate } from "@/lib/dates";
 import type { BillingCycle } from "@/lib/supabase/types-extension";
 
 interface BillFormProps {

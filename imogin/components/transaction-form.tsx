@@ -37,7 +37,7 @@ interface TransactionFormProps {
   categories: CategoryOption[]
   partnershipId: string | null
   partnerUserId: string | null
-  userId: string
+  // userId is not used in the component body
   userProfile: ProfileInfo | null
   partnerProfile: ProfileInfo | null
 }
@@ -62,7 +62,7 @@ function AvatarCircle({ url, name, email, size = 32 }: { url?: string | null; na
   )
 }
 
-export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userId, userProfile, partnerProfile }: TransactionFormProps) {
+export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userProfile, partnerProfile }: TransactionFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)

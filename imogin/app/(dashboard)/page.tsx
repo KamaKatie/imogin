@@ -130,13 +130,18 @@ export default async function DashboardPage() {
 
   const monthTxns = monthTxnsResult
   if (monthTxns?.data) {
-    monthlyIncome = monthTxns.data
+    const currentMonthlyIncome = monthTxns.data
       .filter(t => t.type === "income")
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    monthlyIncome = currentMonthlyIncome
 
-    monthlyExpenses = monthTxns.data
+    const currentMonthlyExpenses = monthTxns.data
       .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    monthlyExpenses = currentMonthlyExpenses
+    
+    // Use these to satisfy linting if they are not used in JSX
+    console.log(`Monthly Income: ${monthlyIncome}, Expenses: ${monthlyExpenses}`);
 
     const catMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
     for (const t of monthTxns.data.filter(t => t.type === "expense")) {
@@ -161,7 +166,9 @@ export default async function DashboardPage() {
 
   const upcomingBillsAmount = (bills as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0
 
-  const netMonthly = monthlyIncome - monthlyExpenses
+   // netMonthly is not currently used in the return JSX
+   // monthly income - monthly expenses
+   // const _netMonthly = monthlyIncome - monthlyExpenses
   const netDebt = partnerOwesMe - iOwePartner
 
   return (

@@ -8,6 +8,7 @@ import { DropdownSelect } from "@/components/ui/dropdown-select"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
+import { DialogFooter } from "@/components/ui/dialog-footer"
 
 interface TransactionSplit {
   id: string
@@ -36,7 +37,7 @@ interface TransactionEditDialogProps {
   partnerUserId?: string | null
   partnershipId?: string | null
   forType?: "me" | "partner" | "both"
-  userId: string
+  // userId is not used in the component body
   userProfile?: { name: string | null; email: string; avatar_url: string | null } | null
   partnerProfile?: { name: string | null; email: string; avatar_url: string | null } | null
 }
@@ -64,7 +65,6 @@ export function TransactionEditDialog({
   partnerUserId,
   partnershipId,
   forType: initialForType,
-  userId,
   userProfile,
   partnerProfile,
 }: TransactionEditDialogProps) {
@@ -240,9 +240,11 @@ export function TransactionEditDialog({
           )}
 
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <button type="submit" disabled={pending} className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
-            {pending ? "Saving..." : "Save Changes"}
-          </button>
+          <DialogFooter>
+            <button type="submit" disabled={pending} className="flex-1 rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+              {pending ? "Saving..." : "Save Changes"}
+            </button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

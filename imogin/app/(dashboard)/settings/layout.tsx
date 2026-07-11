@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { href: "/settings", label: "Profile" },
   { href: "/settings/partner", label: "Partnership" },
-  { href: "/settings/categories", label: "Categories" },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

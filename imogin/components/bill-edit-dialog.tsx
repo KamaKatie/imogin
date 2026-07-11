@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { calculatePreviewDate } from "@/lib/dates";
+import { DialogFooter } from "@/components/ui/dialog-footer";
 import type { BillingCycle } from "@/lib/supabase/types-extension";
 
 interface BillEditDialogProps {
@@ -334,7 +335,7 @@ export function BillEditDialog({
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <div className="flex gap-3 pt-2">
+          <DialogFooter>
             <button
               type="submit"
               disabled={pending}
@@ -362,7 +363,7 @@ export function BillEditDialog({
             >
               Delete
             </button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

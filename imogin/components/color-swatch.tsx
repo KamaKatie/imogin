@@ -1,47 +1,57 @@
 "use client";
 
+import { HexColorPicker } from "react-colorful";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
 interface ColorSwatchProps {
   value: string;
   onChange: (color: string) => void;
 }
 
-const COLORS = [
-  "#E15A5A",
-  "#E27D44",
-  "#E4A834",
-  "#A3B846",
-  "#52A46C",
-  "#379683",
-  "#359BB0",
-  "#4581B8",
-  "#5561B9",
-  "#6A52B5",
-  "#8E52B5",
-  "#AF53A7",
-  "#CC5483",
-  "#6B7280",
-  "#4B5563",
-  "#374151",
-];
-
 export function ColorSwatch({ value, onChange }: ColorSwatchProps) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {COLORS.map((color) => {
-        const selected = color === value;
-        const isLight =
-          color === "#FFFFFF" || color === "#F3F4F6" || color === "#F9FAFB";
-        return (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onChange(color)}
-            className={`w-7 h-7 rounded-full transition-all ${selected ? "ring-2 ring-offset-1 ring-foreground/30" : "ring-1 ring-inset ring-black/10"}`}
-            style={{ backgroundColor: color }}
-            title={color}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm hover:bg-accent transition-colors"
+        >
+          <span
+            className="w-5 h-5 rounded-full border border-border shrink-0"
+            style={{ backgroundColor: value || "#6B7280" }}
           />
-        );
-      })}
-    </div>
+          <span className="font-mono text-xs text-muted-foreground">
+            {value}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="start">
+        <HexColorPicker
+          color={value}
+          onChange={onChange}
+          style={{ width: "100%", height: 160 }}
+        />
+        <div className="flex items-center gap-2 mt-3">
+          <span className="text-xs text-muted-foreground font-mono">#</span>
+          <input
+            type="text"
+            value={value.replace("#", "")}
+            onChange={(e) => {
+              const raw = e.target.value
+                .replace(/[^0-9a-fA-F]/g, "")
+                .slice(0, 6);
+              onChange(raw ? `#${raw.toUpperCase()}` : value);
+            }}
+            className="flex-1 rounded border bg-background px-2 py-1 text-xs font-mono"
+            placeholder="000000"
+            maxLength={6}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

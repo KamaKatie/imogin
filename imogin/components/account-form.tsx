@@ -7,6 +7,7 @@ import { getAccountIcon } from "@/lib/icons"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
+import { DialogFooter } from "@/components/ui/dialog-footer"
 import type { Account } from "@/lib/supabase/types-extension"
 
 const STORAGE_BASE = "https://jjojwvdtwtodapqszizc.supabase.co/storage/v1/object/public/account_icons/"
@@ -182,13 +183,15 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={pending || uploading}
-            className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-          >
-            {pending ? (isEdit ? "Saving..." : "Creating...") : (isEdit ? "Save Changes" : "Create Account")}
-          </button>
+          <DialogFooter>
+            <button
+              type="submit"
+              disabled={pending || uploading}
+              className="flex-1 rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pending ? (isEdit ? "Saving..." : "Creating...") : (isEdit ? "Save Changes" : "Create Account")}
+            </button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

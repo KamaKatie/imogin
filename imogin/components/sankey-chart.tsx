@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { sankey as d3Sankey } from "d3-sankey";
 
 interface CategoryData {
@@ -34,14 +34,15 @@ export function SankeyChart({
   const showBalance = openingBalance > 0;
   const showEnding = endingBalance > 0 && totalInflow > 0;
 
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setTooltip((prev) =>
-      prev
-        ? { ...prev, x: e.clientX - rect.left, y: e.clientY - rect.top - 8 }
-        : null,
-    );
-  }, []);
+    // commented out unused onMouseMove logic
+    // const _onMouseMove = useCallback((e: React.MouseEvent) => {
+    //   const rect = e.currentTarget.getBoundingClientRect();
+    //   setTooltip((prev) =>
+    //     prev
+    //       ? { ...prev, x: e.clientX - rect.left, y: e.clientY - rect.top - 8 }
+    //       : null,
+    //   );
+    // }, []);
 
   const raw = useMemo(() => {
     const nodes: Array<{
@@ -154,7 +155,7 @@ export function SankeyChart({
     if (raw.nodes.length < 2 || raw.links.length === 0) return null;
 
     const gen = d3Sankey()
-      .nodeId((d: any) => d.id)
+      .nodeId((d: { id: string }) => d.id)
       .nodeWidth(16)
       .nodePadding(14)
       .extent([
@@ -176,13 +177,13 @@ export function SankeyChart({
     if (!layout) return [];
     return layout.links.map((l, i) => ({
       d: (() => {
-        const y0 = (l as any).y0;
-        const y1 = (l as any).y1;
-        const sx = (l.source as any).x1;
-        const tx = (l.target as any).x0;
+         const y0 = (l as { y0: number }).y0;
+         const y1 = (l as { y1: number }).y1;
+         const sx = (l.source as { x1: number }).x1;
+         const tx = (l.target as { x0: number }).x0;
         return `M${sx},${y0}C${(sx + tx) / 2},${y0} ${(sx + tx) / 2},${y1} ${tx},${y1}`;
       })(),
-      w: Math.max(1, (l as any).width || 0),
+       w: Math.max(1, (l as { width: number }).width || 0),
       sc: raw.links[i].sc,
       tc: raw.links[i].tc,
       sn: raw.nodes.find((n) => n.id === raw.links[i].source)?.name || "",
@@ -191,8 +192,8 @@ export function SankeyChart({
       pct: raw.links[i].pct,
       si: raw.links[i].source,
       ti: raw.links[i].target,
-      sx: (l.source as any).x1,
-      tx: (l.target as any).x0,
+       sx: (l.source as { x1: number }).x1,
+       tx: (l.target as { x0: number }).x0,
     }));
   }, [layout, raw]);
 
@@ -302,8 +303,8 @@ export function SankeyChart({
         {nds.map((nd) => {
           const h = nd.y1 - nd.y0;
           const r = Math.min(6, h / 2);
-          const isLeft = nd.side === "left";
-          const isRight = nd.side === "right";
+           const isLeft = nd.side === "left";
+           // const _isRight = nd.side === "right"; // unused
 
           let p: string;
           if (nd.side === "center") {

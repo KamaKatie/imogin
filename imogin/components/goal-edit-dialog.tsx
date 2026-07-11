@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog-footer";
 
 interface GoalEditDialogProps {
   goal: {
@@ -53,7 +54,7 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
           Edit
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Goal</DialogTitle>
         </DialogHeader>
@@ -133,13 +134,15 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
             </div>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-          >
-            {pending ? "Saving..." : "Save Changes"}
-          </button>
+          <DialogFooter>
+            <button
+              type="submit"
+              disabled={pending}
+              className="flex-1 rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pending ? "Saving..." : "Save Changes"}
+            </button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

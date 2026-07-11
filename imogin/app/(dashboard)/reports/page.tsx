@@ -72,7 +72,7 @@ export default async function ReportsPage() {
         monthMap.set(key, entry)
       }
 
-      const now = new Date()
+      // const now = new Date()
       for (let i = 23; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`

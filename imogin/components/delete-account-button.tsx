@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog-footer";
 
 interface DeleteAccountButtonProps {
   accountId: string;
@@ -56,7 +57,7 @@ export function DeleteAccountButton({
             action cannot be undone.
           </p>
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3 justify-end">
+          <DialogFooter>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -72,7 +73,7 @@ export function DeleteAccountButton({
             >
               {pending ? "Deleting..." : "Delete"}
             </button>
-          </div>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>
