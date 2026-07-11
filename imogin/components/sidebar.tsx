@@ -14,8 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { getPartnershipId } from "@/lib/queries";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,12 +30,22 @@ const navItems = [
   { href: "/transactions", label: "Transactions", icon: "ArrowLeftRight" },
 ];
 
+interface SidebarProfile {
+  name: string;
+  avatarUrl: string;
+}
+
 interface AccountItem {
   id: string;
   name: string;
   balance: number;
   icon: string | null;
   type: string;
+}
+
+interface SidebarProps {
+  profile: SidebarProfile;
+  accounts: AccountItem[];
 }
 
 const planningItems = [
@@ -226,47 +235,15 @@ const bottomIconMap: Record<string, React.ReactNode> = {
   ),
 };
 
-export function Sidebar() {
+export function Sidebar({ profile, accounts }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const { theme, setTheme } = useTheme();
   const [planningOpen, setPlanningOpen] = useState(true);
-  const [accounts, setAccounts] = useState<AccountItem[]>([]);
-  const [fullName, setFullName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-
-      supabase
-        .from("profiles")
-        .select("name, email, avatar_url")
-        .eq("id", user.id)
-        .single()
-        .then(({ data: profile }) => {
-          setFullName(profile?.name || profile?.email || user.email || "");
-          setAvatarUrl(profile?.avatar_url || "");
-        });
-
-      getPartnershipId(supabase, user.id).then((partnershipId) => {
-        const q = supabase
-          .from("accounts")
-          .select("id, name, balance, icon, type")
-          .or(
-            partnershipId
-              ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-              : `user_id.eq.${user.id}`,
-          )
-          .order("name");
-        q.then(({ data }) => {
-          if (data) setAccounts(data);
-        });
-      });
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const fullName = profile.name;
+  const avatarUrl = profile.avatarUrl;
 
   const initials = fullName ? fullName.charAt(0).toUpperCase() : "?";
 

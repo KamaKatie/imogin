@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { MonthlyLineChart } from "@/components/monthly-line-chart"
+import { LazyMonthlyLineChart } from "@/components/lazy-monthly-chart"
 import { getPartnershipId } from "@/lib/queries"
 
 function getMonthRange() {
@@ -110,7 +110,7 @@ export default async function ReportsPage() {
 
       <div className="rounded-xl border bg-card p-4 md:p-5">
         <h2 className="font-semibold mb-3 md:mb-4 text-sm md:text-base">Monthly Overview</h2>
-        <MonthlyLineChart data={monthlyTrend} />
+        <LazyMonthlyLineChart data={monthlyTrend} />
       </div>
     </div>
   )

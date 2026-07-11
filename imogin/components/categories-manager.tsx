@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createCategory } from "@/lib/actions/categories";
 import { ColorSwatch } from "@/components/color-swatch";
 import { getCategoryIcon, CATEGORY_ICONS, searchIcons } from "@/lib/icons";
-import { PieChartDonut } from "@/components/pie-chart";
+import { LazyPieChartDonut } from "@/components/lazy-pie-chart";
 import {
   Dialog,
   DialogContent,
@@ -185,7 +185,7 @@ export function CategoriesManager({ categories, spendingByCategory = [] }: Categ
             <h2 className="font-semibold">Spending This Month</h2>
             <span className="text-xs text-muted-foreground">¥{spendingByCategory.reduce((sum, c) => sum + c.total, 0).toLocaleString()} total</span>
           </div>
-          <PieChartDonut data={spendingByCategory.map(c => ({ name: c.name, value: c.total, color: c.color, icon: c.icon }))} />
+          <LazyPieChartDonut data={spendingByCategory.map(c => ({ name: c.name, value: c.total, color: c.color, icon: c.icon }))} />
         </div>
       )}
 

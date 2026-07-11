@@ -4,7 +4,7 @@ import Link from "next/link"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getCategoryIcon } from "@/lib/icons"
 import { getPartnershipId, getAccessibleAccountIds } from "@/lib/queries"
-import { CategoryBarChart } from "@/components/category-bar-chart"
+import { LazyCategoryBarChart } from "@/components/lazy-category-chart"
 import { CategoryEditButton } from "@/components/category-edit-button"
 
 export default async function CategoryDetailPage({
@@ -133,7 +133,7 @@ export default async function CategoryDetailPage({
       {monthlyTrend.some(d => d.total > 0) && (
         <div className="rounded-xl border bg-card p-5">
           <h2 className="font-semibold mb-4">Monthly Spending</h2>
-          <CategoryBarChart data={monthlyTrend} color={catColor} />
+          <LazyCategoryBarChart data={monthlyTrend} color={catColor} />
         </div>
       )}
 
