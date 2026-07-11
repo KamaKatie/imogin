@@ -72,7 +72,7 @@ export default async function ReportsPage() {
         monthMap.set(key, entry)
       }
 
-      // const now = new Date()
+      const now = new Date()
       for (let i = 23; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
@@ -83,35 +83,33 @@ export default async function ReportsPage() {
     }
   }
 
-  const now = new Date()
-
   return (
-    <div className="space-y-6">
-      <p className="text-muted-foreground">Spending overview for the last 12 months</p>
+    <div className="space-y-4">
+      <p className="text-muted-foreground text-sm">Spending overview for the last 24 months</p>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Current Balance</p>
-          <p className="text-2xl font-bold mt-1">¥{totalBalance.toLocaleString()}</p>
+      <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
+        <div className="rounded-xl border bg-card p-4 md:p-5">
+          <p className="text-xs md:text-sm text-muted-foreground">Balance</p>
+          <p className="text-xl md:text-2xl font-bold mt-1">¥{totalBalance.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Total Spent</p>
-          <p className="text-2xl font-bold mt-1 text-red-600">¥{totalSpent.toLocaleString()}</p>
+        <div className="rounded-xl border bg-card p-4 md:p-5">
+          <p className="text-xs md:text-sm text-muted-foreground">Spent</p>
+          <p className="text-xl md:text-2xl font-bold mt-1 text-red-600">¥{totalSpent.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Total Income</p>
-          <p className="text-2xl font-bold mt-1 text-green-600">¥{totalIncome.toLocaleString()}</p>
+        <div className="rounded-xl border bg-card p-4 md:p-5">
+          <p className="text-xs md:text-sm text-muted-foreground">Income</p>
+          <p className="text-xl md:text-2xl font-bold mt-1 text-green-600">¥{totalIncome.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Net</p>
-          <p className={`text-2xl font-bold mt-1 ${totalIncome - totalSpent >= 0 ? "text-green-600" : "text-red-600"}`}>
+        <div className="rounded-xl border bg-card p-4 md:p-5">
+          <p className="text-xs md:text-sm text-muted-foreground">Net</p>
+          <p className={`text-xl md:text-2xl font-bold mt-1 ${totalIncome - totalSpent >= 0 ? "text-green-600" : "text-red-600"}`}>
             ¥{(totalIncome - totalSpent).toLocaleString()}
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-5">
-        <h2 className="font-semibold mb-4">Monthly Overview</h2>
+      <div className="rounded-xl border bg-card p-4 md:p-5">
+        <h2 className="font-semibold mb-3 md:mb-4 text-sm md:text-base">Monthly Overview</h2>
         <MonthlyLineChart data={monthlyTrend} />
       </div>
     </div>

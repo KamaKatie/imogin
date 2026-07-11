@@ -64,7 +64,7 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-function SortableHeader({
+function SortableHeader<T>({
   column,
   children,
   className,
@@ -155,7 +155,7 @@ export function DataTable<T>({
   );
 
   const defaultOrder = useMemo(
-    () => columns.map((c) => (c as ColumnDef<T>).accessorKey || (c as ColumnDef<T>).id || ""),
+    () => columns.map((c) => (c as unknown as { accessorKey?: string; id?: string }).accessorKey || (c as unknown as { accessorKey?: string; id?: string }).id || ""),
     [columns],
   );
   const [columnOrder, setColumnOrder] = useState<string[]>(defaultOrder);
@@ -255,8 +255,8 @@ export function DataTable<T>({
                           key={header.id}
                           column={col}
                            className={cn(
-                             (col.columnDef.meta as Record<string, unknown>)?.headerClassName,
-                             (col.columnDef.meta as Record<string, unknown>)?.className,
+                             (col.columnDef.meta as Record<string, string>)?.headerClassName,
+                             (col.columnDef.meta as Record<string, string>)?.className,
                            )}
                           onClick={
                             canSort
@@ -301,9 +301,9 @@ export function DataTable<T>({
                 Array.from({ length: Math.min(pageSize, 10) }).map((_, i) => (
                   <tr key={i}>
                     {columns.map((col) => (
-                       <td
-                         key={(col as ColumnDef<T>).accessorKey || (col as ColumnDef<T>).id || ""}
-                         className="px-4 py-3"
+                        <td
+                          key={(col as unknown as { accessorKey?: string; id?: string }).accessorKey || (col as unknown as { accessorKey?: string; id?: string }).id || ""}
+                          className="px-4 py-3"
                        >
                         <div
                           className="h-4 bg-muted rounded animate-pulse"
@@ -336,10 +336,10 @@ export function DataTable<T>({
                       const col = cell.column;
                       return (
                          <td
-                           key={(col as ColumnDef<T>).accessorKey || (col as ColumnDef<T>).id || ""}
+                         key={(col as unknown as { accessorKey?: string; id?: string }).accessorKey || (col as unknown as { accessorKey?: string; id?: string }).id || ""}
                            className={cn(
                              "px-4 py-3 text-sm",
-                             (col.columnDef.meta as Record<string, unknown>)?.className,
+                             (col.columnDef.meta as Record<string, string>)?.className,
                            )}
                          >
                           <span className="inline-flex items-center gap-1.5">

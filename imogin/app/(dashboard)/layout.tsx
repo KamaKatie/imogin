@@ -16,9 +16,9 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen">
       <Sidebar refreshKey={Date.now()} />
-      <div className="flex flex-col flex-1 ml-64">
+      <div className="flex flex-col flex-1 lg:ml-64">
         <TopBar />
-        <main className="flex-1 overflow-y-auto scrollbar-thin p-6">
+        <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-20 lg:pb-6">
           <PageInfoProvider>
             {children}
           </PageInfoProvider>

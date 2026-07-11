@@ -78,28 +78,28 @@ export function MonthlyLineChart({ data }: MonthlyLineChartProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-4 text-sm">
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex gap-3 text-xs overflow-x-auto scrollbar-thin">
           {lines.map(l => (
-            <label key={l.key} className="flex items-center gap-1.5 cursor-pointer select-none">
+            <label key={l.key} className="flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={visible.has(l.key)}
                 onChange={() => toggle(l.key)}
-                className="size-3.5 accent-black"
+                className="size-3 accent-black"
               />
               {l.label}
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: l.color }} />
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: l.color }} />
             </label>
           ))}
         </div>
 
-        <div className="flex gap-1 text-xs">
+        <div className="flex gap-1 text-xs overflow-x-auto scrollbar-thin">
           {ranges.map(r => (
             <button
               key={r.months}
               onClick={() => setRangeMonths(r.months)}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
+              className={`px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
                 rangeMonths === r.months
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80"
@@ -111,11 +111,11 @@ export function MonthlyLineChart({ data }: MonthlyLineChartProps) {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="currentColor" strokeOpacity={0.3} />
-          <YAxis tick={{ fontSize: 11 }} stroke="currentColor" strokeOpacity={0.3} tickFormatter={(v: number) => `¥${(v / 1000).toFixed(0)}k`} />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="currentColor" strokeOpacity={0.3} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 10 }} stroke="currentColor" strokeOpacity={0.3} tickFormatter={(v: number) => `¥${(v / 1000).toFixed(0)}k`} width={45} />
           <Tooltip content={<CustomTooltip />} />
           {lines.map(l => {
             if (!visible.has(l.key)) return null

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { formatRelativeDate, getOrdinal } from "@/lib/dates"
 import { SankeyChart } from "@/components/sankey-chart"
-import { PieChartDonut } from "@/components/pie-chart"
+
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -258,7 +258,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className={`grid gap-6 ${spendingByCategory.length > 0 || incomeByCategory.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">This Month</h2>
@@ -267,12 +267,29 @@ export default async function DashboardPage() {
           <SankeyChart incomeByCategory={incomeByCategory} expenseByCategory={spendingByCategory} openingBalance={personalBalance} />
         </div>
 
-        {spendingByCategory.length > 0 && (
-          <div className="rounded-xl border bg-card p-5">
-            <h2 className="font-semibold mb-4">Spending by Category</h2>
-            <PieChartDonut data={spendingByCategory.map(c => ({ name: c.name, value: c.total, color: c.color, icon: c.icon }))} />
+        <div className="rounded-xl border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Recent Transactions</h2>
+            <Link href="/transactions" className="text-sm text-primary hover:underline">View all</Link>
           </div>
-        )}
+          {recentTransactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No transactions yet</p>
+          ) : (
+            <div className="space-y-3">
+              {(recentTransactions as Array<{ id: string; amount: number; description: string | null; date: string; type: string }>).map((t) => (
+                <div key={t.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{t.description || "No description"}</p>
+                    <p className="text-xs text-muted-foreground" title={t.date}>{formatRelativeDate(t.date)}</p>
+                  </div>
+                  <p className={`text-sm font-medium ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
+                    {t.type === "income" ? "+" : "-"}¥{Math.abs(t.amount).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {budgets.length > 0 && (
@@ -311,56 +328,30 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className={`grid gap-6 ${goals.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      {goals.length > 0 && (
         <div className="rounded-xl border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">Recent Transactions</h2>
-            <Link href="/transactions" className="text-sm text-primary hover:underline">View all</Link>
+            <h2 className="font-semibold">Active Goals</h2>
+            <Link href="/goals" className="text-sm text-primary hover:underline">View all</Link>
           </div>
-          {recentTransactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transactions yet</p>
-          ) : (
-            <div className="space-y-3">
-              {(recentTransactions as Array<{ id: string; amount: number; description: string | null; date: string; type: string }>).map((t) => (
-                <div key={t.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{t.description || "No description"}</p>
-                    <p className="text-xs text-muted-foreground" title={t.date}>{formatRelativeDate(t.date)}</p>
+          <div className="space-y-4">
+            {(goals as Array<{ id: string; name: string; target_amount: number; current_amount: number; color: string | null }>).map((g) => {
+              const progress = g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 100) : 0
+              return (
+                <div key={g.id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">{g.name}</span>
+                    <span className="text-muted-foreground">¥{g.current_amount.toLocaleString()} / ¥{g.target_amount.toLocaleString()}</span>
                   </div>
-                  <p className={`text-sm font-medium ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                    {t.type === "income" ? "+" : "-"}¥{Math.abs(t.amount).toLocaleString()}
-                  </p>
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: g.color || "#10B981" }} />
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {goals.length > 0 && (
-          <div className="rounded-xl border bg-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold">Active Goals</h2>
-              <Link href="/goals" className="text-sm text-primary hover:underline">View all</Link>
-            </div>
-            <div className="space-y-4">
-              {(goals as Array<{ id: string; name: string; target_amount: number; current_amount: number; color: string | null }>).map((g) => {
-                const progress = g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 100) : 0
-                return (
-                  <div key={g.id}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{g.name}</span>
-                      <span className="text-muted-foreground">¥{g.current_amount.toLocaleString()} / ¥{g.target_amount.toLocaleString()}</span>
-                    </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: g.color || "#10B981" }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+              )
+            })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

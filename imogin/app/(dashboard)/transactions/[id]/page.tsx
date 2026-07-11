@@ -149,7 +149,6 @@ export default async function TransactionDetailPage({
               partnerUserId={partnerUserId}
               partnershipId={partnershipId}
               forType={forType}
-              userId={user.id}
               userProfile={userProfile}
               partnerProfile={partnerProfile}
             />
@@ -216,7 +215,7 @@ export default async function TransactionDetailPage({
               <div
                 className={`flex flex-col items-center gap-1 p-2 rounded-lg ${forType === "both" ? "bg-accent" : "bg-accent/50"}`}
               >
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary">
+                <div className="w-10 h-10 rounded-full overflow-hidden">
                   {userProfile?.avatar_url ? (
                     <img
                       src={userProfile.avatar_url}
@@ -240,7 +239,7 @@ export default async function TransactionDetailPage({
               <div
                 className={`flex flex-col items-center gap-1 p-2 rounded-lg ${forType === "both" ? "bg-accent" : "bg-accent/50"}`}
               >
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary">
+                <div className="w-10 h-10 rounded-full overflow-hidden">
                   {partnerProfile?.avatar_url ? (
                     <img
                       src={partnerProfile.avatar_url}

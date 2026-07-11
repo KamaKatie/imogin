@@ -18,15 +18,51 @@ export default async function CategoriesPage() {
     )
   }
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name, icon, color, type")
-    .eq("partnership_id", partnershipId)
-    .order("name")
+  const [{ data: categories }, personalAccountsResult, sharedResult] = await Promise.all([
+    supabase
+      .from("categories")
+      .select("id, name, icon, color, type")
+      .eq("partnership_id", partnershipId)
+      .order("name"),
+    supabase.from("accounts").select("id").eq("user_id", user.id).eq("is_shared", false),
+    supabase.from("accounts").select("id").eq("partnership_id", partnershipId).eq("is_shared", true),
+  ])
+
+  const personalAccountIds = personalAccountsResult.data?.map(a => a.id) || []
+  const sharedAccountIds = sharedResult.data?.map(a => a.id) || []
+  const allAccountIds = [...personalAccountIds, ...sharedAccountIds]
+
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+
+  let spendingByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
+
+  if (allAccountIds.length > 0) {
+    const { data: monthTxns } = await supabase
+      .from("transactions")
+      .select("amount, type, category_id, categories(name, color, icon)")
+      .in("account_id", allAccountIds)
+      .gte("date", firstDay)
+      .lte("date", lastDay)
+
+    if (monthTxns) {
+      const catMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
+      for (const t of monthTxns.filter(t => t.type === "expense")) {
+        const catArr = t.categories as unknown as { name: string; color: string | null; icon: string | null }[] | null
+        const cat = Array.isArray(catArr) ? catArr[0] ?? null : catArr
+        const key = t.category_id || "uncategorized"
+        const existing = catMap.get(key) || { name: cat?.name || "Uncategorized", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
+        existing.total += Math.abs(t.amount)
+        catMap.set(key, existing)
+      }
+      spendingByCategory = Array.from(catMap.values()).sort((a, b) => b.total - a.total)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <CategoriesManager categories={categories || []} />
+      <CategoriesManager categories={categories || []} spendingByCategory={spendingByCategory} />
     </div>
   )
 }

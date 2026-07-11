@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { TransactionForm } from "@/components/transaction-form";
 import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table";
+import { MobileFab } from "@/components/mobile-fab";
 import { getPartnershipId, getPartnerUserId } from "@/lib/queries";
 
 export default async function TransactionsPage({
@@ -162,7 +163,6 @@ export default async function TransactionsPage({
           categories={categories}
           partnershipId={partnershipId}
           partnerUserId={partnerUserId}
-          userId={user.id}
           userProfile={userProfile}
           partnerProfile={partnerProfile}
         />
@@ -179,6 +179,15 @@ export default async function TransactionsPage({
         accounts={filterAccounts}
         categories={filterCategories}
         payers={filterPayers}
+      />
+
+      <MobileFab
+        accounts={allAccounts}
+        categories={categories}
+        partnershipId={partnershipId}
+        partnerUserId={partnerUserId}
+        userProfile={userProfile}
+        partnerProfile={partnerProfile}
       />
     </div>
   );

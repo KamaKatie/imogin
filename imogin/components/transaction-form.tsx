@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation"
 import { getCategoryIcon } from "@/lib/icons"
 import { DropdownSelect } from "@/components/ui/dropdown-select"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog"
+  BottomSheet, BottomSheetContent, BottomSheetHeader, BottomSheetTitle, BottomSheetTrigger,
+} from "@/components/ui/bottom-sheet"
 
 interface AccountOption {
   id: string
@@ -40,6 +40,7 @@ interface TransactionFormProps {
   // userId is not used in the component body
   userProfile: ProfileInfo | null
   partnerProfile: ProfileInfo | null
+  trigger?: React.ReactNode
 }
 
 function getAvatarUrl(profile: ProfileInfo | null): string | null {
@@ -62,7 +63,7 @@ function AvatarCircle({ url, name, email, size = 32 }: { url?: string | null; na
   )
 }
 
-export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userProfile, partnerProfile }: TransactionFormProps) {
+export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userProfile, partnerProfile, trigger }: TransactionFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -110,16 +111,18 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90">
-          Add Transaction
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New Transaction</DialogTitle>
-        </DialogHeader>
+    <BottomSheet open={open} onOpenChange={setOpen}>
+      <BottomSheetTrigger asChild>
+        {trigger || (
+          <button className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90">
+            Add Transaction
+          </button>
+        )}
+      </BottomSheetTrigger>
+      <BottomSheetContent className="sm:max-w-lg">
+        <BottomSheetHeader>
+          <BottomSheetTitle>New Transaction</BottomSheetTitle>
+        </BottomSheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -243,7 +246,7 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
             {pending ? "Creating..." : "Create Transaction"}
           </button>
         </form>
-      </DialogContent>
-    </Dialog>
+      </BottomSheetContent>
+    </BottomSheet>
   )
 }

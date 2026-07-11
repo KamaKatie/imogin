@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { PWARegister } from "@/components/pwa-register";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -10,6 +11,18 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Imogin",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Imogin",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 const geistSans = Geist({
@@ -25,7 +38,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#171717" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className={`${geistSans.className} antialiased`}>
+        <PWARegister />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

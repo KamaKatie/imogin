@@ -3,13 +3,10 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from "@/lib/actions/categories";
+import { createCategory } from "@/lib/actions/categories";
 import { ColorSwatch } from "@/components/color-swatch";
 import { getCategoryIcon, CATEGORY_ICONS, searchIcons } from "@/lib/icons";
+import { PieChartDonut } from "@/components/pie-chart";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +26,7 @@ interface Category {
 
 interface CategoriesManagerProps {
   categories: Category[];
+  spendingByCategory?: { name: string; color: string | null; icon: string | null; total: number }[];
 }
 
 function IconPicker({
@@ -78,25 +76,16 @@ function IconPicker({
   );
 }
 
-export function CategoriesManager({ categories }: CategoriesManagerProps) {
+export function CategoriesManager({ categories, spendingByCategory = [] }: CategoriesManagerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [selectedColor, setSelectedColor] = useState("#4F46E5");
   const [selectedIcon, setSelectedIcon] = useState("");
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editColor, setEditColor] = useState("#4F46E5");
-  const [editIcon, setEditIcon] = useState("");
-  const [moreIconsOpen, setMoreIconsOpen] = useState(false);
-  const [iconPickerTarget, setIconPickerTarget] = useState<"create" | "edit">(
-    "create",
-  );
+  const [activeTab, setActiveTab] = useState<"all" | "expense" | "income" | "transfer">("all");
 
-  const incomeCategories = categories.filter((c) => c.type === "income");
-  const expenseCategories = categories.filter((c) => c.type === "expense");
-  const transferCategories = categories.filter((c) => c.type === "transfer");
+  const filteredCategories = activeTab === "all" ? categories : categories.filter((c) => c.type === activeTab);
 
   const handleAdd = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -113,48 +102,6 @@ export function CategoriesManager({ categories }: CategoriesManagerProps) {
       setError((err as Error).message);
     }
     setPending(false);
-  };
-
-  const handleEditClick = (c: Category) => {
-    setEditingCategory(c);
-    setEditColor(c.color || "#4F46E5");
-    setEditIcon(c.icon || "");
-    setEditOpen(true);
-  };
-
-  const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingCategory) return;
-    setPending(true);
-    setError("");
-    try {
-      const fd = new FormData(e.currentTarget);
-      fd.set("id", editingCategory.id);
-      fd.set("icon", editIcon);
-      await updateCategory(fd);
-      setEditOpen(false);
-      setEditingCategory(null);
-      setEditIcon("");
-      router.refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-    setPending(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (
-      !confirm(
-        "Delete this category? Transactions using it will be uncategorized.",
-      )
-    )
-      return;
-    try {
-      await deleteCategory(id);
-      router.refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    }
   };
 
   return (
@@ -207,16 +154,6 @@ export function CategoriesManager({ categories }: CategoriesManagerProps) {
                   selected={selectedIcon}
                   onSelect={setSelectedIcon}
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIconPickerTarget("create");
-                    setMoreIconsOpen(true);
-                  }}
-                  className="text-xs text-muted-foreground hover:underline mt-1"
-                >
-                  More icons...
-                </button>
                 <input type="hidden" name="icon" value={selectedIcon} />
               </div>
               <div className="space-y-2">
@@ -242,224 +179,73 @@ export function CategoriesManager({ categories }: CategoriesManagerProps) {
         </Dialog>
       </div>
 
+      {spendingByCategory.length > 0 && (
+        <div className="rounded-xl border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Spending This Month</h2>
+            <span className="text-xs text-muted-foreground">¥{spendingByCategory.reduce((sum, c) => sum + c.total, 0).toLocaleString()} total</span>
+          </div>
+          <PieChartDonut data={spendingByCategory.map(c => ({ name: c.name, value: c.total, color: c.color, icon: c.icon }))} />
+        </div>
+      )}
+
       {categories.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No categories yet. Add one above.
         </p>
       ) : (
-        <div className="space-y-4">
-          {incomeCategories.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold mb-2 text-green-600">
-                Income
-              </h3>
-              <div className="space-y-2">
-                {incomeCategories.map((c) => (
+        <div>
+          <div className="flex gap-1 text-sm mb-4 border-b border-border">
+            {(["all", "expense", "income", "transfer"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-2 font-medium capitalize transition-colors border-b-2 -mb-px ${
+                  activeTab === tab
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+            {filteredCategories.map((c) => {
+              const spent = spendingByCategory.find(s => s.name === c.name)
+              return (
+                <Link
+                  key={c.id}
+                  href={`/categories/${c.id}`}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border bg-card p-3 hover:bg-accent/50 transition-colors text-center"
+                >
                   <div
-                    key={c.id}
-                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-accent/50 transition-colors"
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: (c.color || "#6B7280") + "18" }}
                   >
-                    <Link
-                      href={`/categories/${c.id}`}
-                      className="flex items-center gap-3 min-w-0 flex-1"
-                    >
-                      <div
-                        className="w-4 h-4 rounded-full shrink-0"
-                        style={{ backgroundColor: c.color || "#6B7280" }}
-                      />
-                      <span className="text-sm flex items-center gap-1.5 font-medium truncate">
-                        {getCategoryIcon(c.icon, 18)}
-                        {c.name}
-                      </span>
-                    </Link>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleEditClick(c);
-                      }}
-                      className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
-                    >
-                      Edit
-                    </button>
+                    <span style={{ color: c.color || "#6B7280" }}>
+                      {getCategoryIcon(c.icon, 20)}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {expenseCategories.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold mb-2 text-red-600">
-                Expense
-              </h3>
-              <div className="space-y-2">
-                {expenseCategories.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-accent/50 transition-colors"
-                  >
-                    <Link
-                      href={`/categories/${c.id}`}
-                      className="flex items-center gap-3 min-w-0 flex-1"
-                    >
-                      <div
-                        className="w-4 h-4 rounded-full shrink-0"
-                        style={{ backgroundColor: c.color || "#6B7280" }}
-                      />
-                      <span className="text-sm flex items-center gap-1.5 font-medium truncate">
-                        {getCategoryIcon(c.icon, 18)}
-                        {c.name}
+                  <span className="text-sm font-medium truncate w-full">{c.name}</span>
+                  {c.type === "expense" && (
+                    spent ? (
+                      <span className="text-sm text-muted-foreground tabular-nums font-medium">
+                        ¥{spent.total.toLocaleString()}
                       </span>
-                    </Link>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleEditClick(c);
-                      }}
-                      className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {transferCategories.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold mb-2 text-blue-600">
-                Transfer
-              </h3>
-              <div className="space-y-2">
-                {transferCategories.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-accent/50 transition-colors"
-                  >
-                    <Link
-                      href={`/categories/${c.id}`}
-                      className="flex items-center gap-3 min-w-0 flex-1"
-                    >
-                      <div
-                        className="w-4 h-4 rounded-full shrink-0"
-                        style={{ backgroundColor: c.color || "#6B7280" }}
-                      />
-                      <span className="text-sm flex items-center gap-1.5 font-medium truncate">
-                        {getCategoryIcon(c.icon, 18)}
-                        {c.name}
+                    ) : (
+                      <span className="text-sm text-muted-foreground tabular-nums font-medium">
+                        ¥0
                       </span>
-                    </Link>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleEditClick(c);
-                      }}
-                      className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                    )
+                  )}
+                </Link>
+              )
+            })}
+          </div>
         </div>
       )}
-
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Category</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="edit-name" className="text-sm font-medium">
-                Name
-              </label>
-              <input
-                id="edit-name"
-                name="name"
-                required
-                defaultValue={editingCategory?.name || ""}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="edit-type" className="text-sm font-medium">
-                Type
-              </label>
-              <select
-                id="edit-type"
-                name="type"
-                required
-                defaultValue={editingCategory?.type || "expense"}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-                <option value="transfer">Transfer</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Icon</label>
-              <IconPicker selected={editIcon} onSelect={setEditIcon} />
-              <button
-                type="button"
-                onClick={() => {
-                  setIconPickerTarget("edit");
-                  setMoreIconsOpen(true);
-                }}
-                className="text-xs text-muted-foreground hover:underline mt-1"
-              >
-                More icons...
-              </button>
-              <input type="hidden" name="icon" value={editIcon} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Color</label>
-              <ColorSwatch value={editColor} onChange={setEditColor} />
-              <input type="hidden" name="color" value={editColor} />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <DialogFooter>
-              <button
-                type="submit"
-                disabled={pending}
-                className="flex-1 rounded-lg bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-              >
-                {pending ? "Saving..." : "Save Changes"}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  setEditOpen(false);
-                   if (editingCategory) handleDelete(editingCategory.id);
-                }}
-                className="rounded-lg border border-red-300 text-red-600 px-4 py-2.5 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={moreIconsOpen} onOpenChange={setMoreIconsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Choose Icon</DialogTitle>
-          </DialogHeader>
-          <IconPicker
-            selected={iconPickerTarget === "create" ? selectedIcon : editIcon}
-            onSelect={(name) => {
-              if (iconPickerTarget === "create") setSelectedIcon(name);
-              else setEditIcon(name);
-              setMoreIconsOpen(false);
-            }}
-            className="max-h-80"
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -155,7 +155,7 @@ export function SankeyChart({
     if (raw.nodes.length < 2 || raw.links.length === 0) return null;
 
     const gen = d3Sankey()
-      .nodeId((d: { id: string }) => d.id)
+      .nodeId((d: unknown) => (d as { id: string }).id)
       .nodeWidth(16)
       .nodePadding(14)
       .extent([

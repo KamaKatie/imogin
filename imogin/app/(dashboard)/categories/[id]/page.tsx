@@ -4,6 +4,8 @@ import Link from "next/link"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getCategoryIcon } from "@/lib/icons"
 import { getPartnershipId, getAccessibleAccountIds } from "@/lib/queries"
+import { CategoryBarChart } from "@/components/category-bar-chart"
+import { CategoryEditButton } from "@/components/category-edit-button"
 
 export default async function CategoryDetailPage({
   params,
@@ -49,6 +51,37 @@ export default async function CategoryDetailPage({
 
   const catColor = category.color || "#6B7280"
 
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth() - 23, 1)
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+  const { data: trendTxns } = await supabase
+    .from("transactions")
+    .select("amount, type, date")
+    .eq("category_id", id)
+    .in("account_id", accountIds)
+    .gte("date", monthStart.toISOString().split("T")[0])
+    .lte("date", monthEnd.toISOString().split("T")[0])
+    .order("date", { ascending: true })
+
+  const monthlyTrend: Array<{ label: string; total: number }> = []
+
+  if (trendTxns) {
+    const monthMap = new Map<string, number>()
+    for (const t of trendTxns) {
+      const key = t.date.slice(0, 7)
+      const existing = monthMap.get(key) || 0
+      monthMap.set(key, existing + Math.abs(t.amount))
+    }
+
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      const label = d.toLocaleString("default", { month: "short", year: "2-digit" })
+      monthlyTrend.push({ label, total: monthMap.get(key) || 0 })
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageBreadcrumbs
@@ -59,19 +92,22 @@ export default async function CategoryDetailPage({
       />
 
       <div className="rounded-xl border bg-card p-6">
-        <div className="flex items-center gap-4">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: catColor + "18" }}
-          >
-            <span style={{ color: catColor }}>
-              {getCategoryIcon(category.icon, 24)}
-            </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: catColor + "18" }}
+            >
+              <span style={{ color: catColor }}>
+                {getCategoryIcon(category.icon, 24)}
+              </span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">{category.name}</h1>
+              <p className="text-sm text-muted-foreground capitalize">{category.type}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold">{category.name}</h1>
-            <p className="text-sm text-muted-foreground capitalize">{category.type}</p>
-          </div>
+          <CategoryEditButton category={category} />
         </div>
       </div>
 
@@ -93,6 +129,13 @@ export default async function CategoryDetailPage({
           </p>
         </div>
       </div>
+
+      {monthlyTrend.some(d => d.total > 0) && (
+        <div className="rounded-xl border bg-card p-5">
+          <h2 className="font-semibold mb-4">Monthly Spending</h2>
+          <CategoryBarChart data={monthlyTrend} color={catColor} />
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold mb-4">Transactions</h2>
