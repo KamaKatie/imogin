@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { formatRelativeDate, getOrdinal } from "@/lib/dates"
-import { SankeyChart } from "@/components/sankey-chart"
+import { SankeyChart } from "@/components/lazy-sankey"
 
 import Link from "next/link"
 
@@ -10,9 +10,14 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+
+  // Batch 1: All independent user data in parallel
   const [profileResult, membershipResult, personalAccountsResult] = await Promise.all([
     supabase.from("profiles").select("name, email").eq("id", user.id).single(),
-    supabase.from("partnership_members").select("partnership_id").eq("user_id", user.id).maybeSingle(),
+    supabase.from("partnership_members").select("partnership_id, user_id").eq("user_id", user.id).maybeSingle(),
     supabase.from("accounts").select("*").eq("user_id", user.id).eq("is_shared", false),
   ])
 
@@ -20,25 +25,23 @@ export default async function DashboardPage() {
   const displayName = profile?.name || profile?.email || user.email
   const partnershipId = membershipResult.data?.partnership_id || null
   const personalAccounts = personalAccountsResult.data || []
+  const personalBalance = personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
 
-  let partnerProfile: { name: string | null; email: string } | null = null
+  // Find partner user ID from membership data we already have
   let partnerUserId: string | null = null
-  let partnerOwesMe = 0
-  let iOwePartner = 0
+
+  // Batch 2: Partnership data (all in parallel once we have partnershipId)
+  let partnerProfile: { name: string | null; email: string } | null = null
   let goals: unknown[] = []
   let bills: unknown[] = []
   let budgets: unknown[] = []
   let sharedAccounts: unknown[] = []
   let sharedIds: string[] = []
-  let spendingByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
-  let incomeByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
-  let monthlyIncome = 0
-  let monthlyExpenses = 0
-
-  const personalBalance = personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
+  let partnerOwesMe = 0
+  let iOwePartner = 0
 
   if (partnershipId) {
-    const [sharedResult, goalsResult, billsResult, memberResult] = await Promise.all([
+    const [sharedResult, goalsResult, billsResult, membersResult] = await Promise.all([
       supabase.from("accounts").select("*").eq("partnership_id", partnershipId).eq("is_shared", true),
       supabase.from("goals").select("*").eq("partnership_id", partnershipId).eq("status", "active"),
       supabase.from("bills").select("*, categories(name, color)").eq("partnership_id", partnershipId).eq("active", true),
@@ -49,66 +52,55 @@ export default async function DashboardPage() {
     sharedIds = sharedAccounts.map(a => (a as { id: string }).id)
     goals = goalsResult.data || []
     bills = billsResult.data || []
-    partnerUserId = memberResult.data?.find((m) => m.user_id !== user.id)?.user_id || null
+    partnerUserId = membersResult.data?.find((m) => m.user_id !== user.id)?.user_id || null
 
+    // Fetch partner profile + partner user ID in parallel
+    let partnerUserId2 = partnerUserId
     if (partnerUserId) {
-      const partnerResult = await supabase
-        .from("profiles")
-        .select("name, email")
-        .eq("id", partnerUserId)
-        .single()
-      partnerProfile = partnerResult.data
+      const profileRes = await supabase.from("profiles").select("name, email").eq("id", partnerUserId).single()
+      partnerProfile = profileRes.data
     }
 
-    if (sharedIds.length > 0 && partnerUserId) {
-      const { data: txIds } = await supabase
-        .from("transactions")
-        .select("id")
-        .in("account_id", sharedIds)
-
-      const idList = txIds?.map(t => t.id) || []
-      if (idList.length > 0) {
-        const { data: unsettled } = await supabase
+    // Fetch splits separately
+    if (sharedIds.length > 0 && partnerUserId2) {
+      const txRes = await supabase.from("transactions").select("id").in("account_id", sharedIds)
+      const txIds = txRes.data?.map(t => t.id) || []
+      if (txIds.length > 0) {
+        const splitsRes = await supabase
           .from("transaction_splits")
-          .select("user_id, amount")
-          .in("transaction_id", idList)
+          .select("user_id, amount, settled")
           .eq("settled", false)
-
-        for (const s of unsettled || []) {
-          if (s.user_id === partnerUserId) partnerOwesMe += s.amount
-          if (s.user_id === user.id) iOwePartner += s.amount
+          .in("transaction_id", txIds)
+        if (splitsRes.data) {
+          for (const s of splitsRes.data) {
+            if (s.user_id === partnerUserId2) partnerOwesMe += s.amount
+            if (s.user_id === user.id) iOwePartner += s.amount
+          }
         }
       }
     }
   }
 
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
-
+  // Batch 3: Transaction data (all in parallel)
   const allAccountIds = [
     ...personalAccounts.map(a => a.id),
     ...sharedIds,
   ]
 
-  let txnQuery = supabase
-    .from("transactions")
-    .select(`*, accounts!account_id!inner(name, is_shared)`)
-    .eq("user_id", user.id)
-    .order("date", { ascending: false })
-    .limit(5)
-
-  if (partnershipId && sharedIds.length > 0) {
-    txnQuery = supabase
-      .from("transactions")
-      .select(`*, accounts!account_id!inner(name, is_shared)`)
-      .or(`user_id.eq.${user.id},account_id.in.(${sharedIds.join(",")})`)
-      .order("date", { ascending: false })
-      .limit(5)
-  }
-
   const [recentTxnData, monthTxnsResult, budgetsResult] = await Promise.all([
-    txnQuery,
+    partnershipId && sharedIds.length > 0
+      ? supabase
+          .from("transactions")
+          .select(`*, accounts!account_id!inner(name, is_shared)`)
+          .or(`user_id.eq.${user.id},account_id.in.(${sharedIds.join(",")})`)
+          .order("date", { ascending: false })
+          .limit(5)
+      : supabase
+          .from("transactions")
+          .select(`*, accounts!account_id!inner(name, is_shared)`)
+          .eq("user_id", user.id)
+          .order("date", { ascending: false })
+          .limit(5),
     allAccountIds.length > 0
       ? supabase
           .from("transactions")
@@ -128,23 +120,21 @@ export default async function DashboardPage() {
   const recentTransactions = recentTxnData.data || []
   budgets = budgetsResult.data || []
 
-  const monthTxns = monthTxnsResult
-  if (monthTxns?.data) {
-    const currentMonthlyIncome = monthTxns.data
+  let spendingByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
+  let incomeByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
+  let monthlyIncome = 0
+  let monthlyExpenses = 0
+
+  if (monthTxnsResult?.data) {
+    monthlyIncome = monthTxnsResult.data
       .filter(t => t.type === "income")
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    monthlyIncome = currentMonthlyIncome
-
-    const currentMonthlyExpenses = monthTxns.data
+    monthlyExpenses = monthTxnsResult.data
       .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    monthlyExpenses = currentMonthlyExpenses
-    
-    // Use these to satisfy linting if they are not used in JSX
-    console.log(`Monthly Income: ${monthlyIncome}, Expenses: ${monthlyExpenses}`);
 
     const catMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
-    for (const t of monthTxns.data.filter(t => t.type === "expense")) {
+    for (const t of monthTxnsResult.data.filter(t => t.type === "expense")) {
       const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
       const key = t.category_id || "uncategorized"
       const existing = catMap.get(key) || { name: cat?.name || "Uncategorized", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
@@ -154,7 +144,7 @@ export default async function DashboardPage() {
     spendingByCategory = Array.from(catMap.values()).sort((a, b) => b.total - a.total)
 
     const incMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
-    for (const t of monthTxns.data.filter(t => t.type === "income")) {
+    for (const t of monthTxnsResult.data.filter(t => t.type === "income")) {
       const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
       const key = t.category_id || "uncategorized"
       const existing = incMap.get(key) || { name: cat?.name || "Income", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
@@ -165,10 +155,6 @@ export default async function DashboardPage() {
   }
 
   const upcomingBillsAmount = (bills as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0
-
-   // netMonthly is not currently used in the return JSX
-   // monthly income - monthly expenses
-   // const _netMonthly = monthlyIncome - monthlyExpenses
   const netDebt = partnerOwesMe - iOwePartner
 
   return (
@@ -219,7 +205,6 @@ export default async function DashboardPage() {
               {(bills as Array<{ id: string; name: string; amount: number; next_billing_date: string; billing_cycle: string; due_day: number | null; categories: { name: string; color: string | null } | null }>)
                 .filter((s) => {
                   const due = new Date(s.next_billing_date)
-                  const now = new Date()
                   return due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear()
                 })
                 .map((s) => {
@@ -250,7 +235,6 @@ export default async function DashboardPage() {
           )}
           {(bills as Array<{ next_billing_date: string }>).filter((s) => {
             const due = new Date(s.next_billing_date)
-            const now = new Date()
             return due.getMonth() === now.getMonth() && due.getFullYear() === now.getFullYear()
           }).length === 0 && (
             <p className="text-xs text-muted-foreground mt-3">No bills due this month</p>

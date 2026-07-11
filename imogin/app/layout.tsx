@@ -3,7 +3,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { PWARegister } from "@/components/pwa-register";
+import { ClearServiceWorker } from "../components/clear-sw";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -13,7 +13,6 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Imogin",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   other: {
-    "mobile-web-app-capable": "yes",
+    "theme-color": "#171717",
   },
 };
 
@@ -40,12 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="theme-color" content="#171717" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
       <body className={`${geistSans.className} antialiased`}>
-        <PWARegister />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -56,6 +50,7 @@ export default function RootLayout({
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />
+        <ClearServiceWorker />
       </body>
     </html>
   );

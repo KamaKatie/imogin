@@ -226,7 +226,7 @@ const bottomIconMap: Record<string, React.ReactNode> = {
   ),
 };
 
-export function Sidebar({ refreshKey }: { refreshKey: number }) {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -265,7 +265,8 @@ export function Sidebar({ refreshKey }: { refreshKey: number }) {
         });
       });
     });
-  }, [supabase, refreshKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const initials = fullName ? fullName.charAt(0).toUpperCase() : "?";
 
@@ -283,7 +284,7 @@ export function Sidebar({ refreshKey }: { refreshKey: number }) {
             href="/"
             className="flex items-center gap-2 text-xl font-bold tracking-tight"
           >
-            <img src="/imogin.png" alt="Imogin" className="w-6 h-6 rounded-md" />
+            <img src="/icon.png" alt="Imogin" className="w-6 h-6 rounded-md" />
             IMOGIN
           </Link>
         </div>
