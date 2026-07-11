@@ -2,17 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 
-function parseJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const base64 = token.split(".")[1];
-    const padded = base64.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = atob(padded);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -45,28 +34,18 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
+  // Redirect old /subscriptions paths to /bills
   if (request.nextUrl.pathname.startsWith("/subscriptions")) {
     const url = request.nextUrl.clone();
     url.pathname = url.pathname.replace(/^\/subscriptions/, "/bills");
     return NextResponse.redirect(url);
   }
 
-  // Lightweight auth check: decode the access token JWT locally
-  // instead of making an RPC call to Supabase Auth via getClaims().
-  // This saves ~100-300ms per navigation.
-  const accessToken = request.cookies.get("sb-access-token")?.value
-    || request.cookies.get("sb-localhost-auth-token")?.value;
-
-  let isAuthed = false;
-  if (accessToken) {
-    const payload = parseJwtPayload(accessToken);
-    if (payload && typeof payload.exp === "number") {
-      isAuthed = payload.exp * 1000 > Date.now();
-    }
-  }
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
   if (
-    !isAuthed &&
+    !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {
@@ -75,5 +54,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  // Only return the response with refreshed cookies if setAll was called
+  // (meaning the session was actually refreshed). Otherwise return a plain
+  // response without Set-Cookie headers to avoid unnecessary reloads.
+  if (supabaseResponse.cookies.getAll().length > 0) {
+    return supabaseResponse;
+  }
+
+  return NextResponse.next({ request });
 }
