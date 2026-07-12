@@ -148,21 +148,23 @@ export function CategoriesManager({ categories, spendingByCategory = [] }: Categ
                   <option value="transfer">Transfer</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Icon</label>
-                <IconPicker
-                  selected={selectedIcon}
-                  onSelect={setSelectedIcon}
-                />
-                <input type="hidden" name="icon" value={selectedIcon} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Color</label>
-                <ColorSwatch
-                  value={selectedColor}
-                  onChange={setSelectedColor}
-                />
-                <input type="hidden" name="color" value={selectedColor} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Icon</label>
+                  <IconPicker
+                    selected={selectedIcon}
+                    onSelect={setSelectedIcon}
+                  />
+                  <input type="hidden" name="icon" value={selectedIcon} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Color</label>
+                  <ColorSwatch
+                    value={selectedColor}
+                    onChange={setSelectedColor}
+                  />
+                  <input type="hidden" name="color" value={selectedColor} />
+                </div>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <DialogFooter>
@@ -211,35 +213,31 @@ export function CategoriesManager({ categories, spendingByCategory = [] }: Categ
             ))}
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+          <div className="flex flex-col gap-1 sm:grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 sm:gap-2">
             {filteredCategories.map((c) => {
               const spent = spendingByCategory.find(s => s.name === c.name)
               return (
                 <Link
                   key={c.id}
                   href={`/categories/${c.id}`}
-                  className="flex flex-col items-center gap-1.5 rounded-xl border bg-card p-3 hover:bg-accent/50 transition-colors text-center"
+                  className="flex items-center gap-3 rounded-xl border bg-card p-3 hover:bg-accent/50 transition-colors sm:flex-col sm:items-center sm:gap-1.5 sm:text-center"
                 >
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                     style={{ backgroundColor: (c.color || "#6B7280") + "18" }}
                   >
                     <span style={{ color: c.color || "#6B7280" }}>
                       {getCategoryIcon(c.icon, 20)}
                     </span>
                   </div>
-                  <span className="text-sm font-medium truncate w-full">{c.name}</span>
-                  {c.type === "expense" && (
-                    spent ? (
-                      <span className="text-sm text-muted-foreground tabular-nums font-medium">
-                        ¥{spent.total.toLocaleString()}
+                  <div className="flex-1 sm:flex-none sm:w-full flex items-center justify-between sm:flex-col sm:items-center">
+                    <span className="text-sm font-medium truncate sm:w-full">{c.name}</span>
+                    {c.type === "expense" && (
+                      <span className="text-sm text-muted-foreground tabular-nums font-medium sm:text-xs">
+                        {spent ? `¥${spent.total.toLocaleString()}` : "¥0"}
                       </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground tabular-nums font-medium">
-                        ¥0
-                      </span>
-                    )
-                  )}
+                    )}
+                  </div>
                 </Link>
               )
             })}

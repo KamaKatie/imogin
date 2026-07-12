@@ -4,6 +4,7 @@ import { PageBreadcrumbs } from "@/lib/page-info"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
 import { getAppContext } from "@/lib/app-context"
 import { getGoalById } from "@/lib/queries/goals"
+import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
 
 export default async function GoalDetailPage({
   params,
@@ -27,6 +28,33 @@ export default async function GoalDetailPage({
 
   const progress = goal.target_amount > 0 ? Math.min((goal.current_amount / goal.target_amount) * 100, 100) : 0
   const daysLeft = goal.target_date ? Math.ceil((new Date(goal.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
+
+  const contributions = (goal.goal_contributions as Array<{
+    id: string; amount: number; note: string | null;
+    created_at: string; user_id: string; account_id: string | null;
+  }>) || []
+
+  const contributorIds = [...new Set(contributions.map(c => c.user_id).filter(Boolean))]
+  let profileMap = new Map<string, { name: string | null; email: string }>()
+  if (contributorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, name, email")
+      .in("id", contributorIds)
+    for (const p of profiles || []) {
+      profileMap.set(p.id, { name: p.name, email: p.email })
+    }
+  }
+
+  const sortedContributions = [...contributions].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+
+  const [personalAccounts, sharedAccounts] = await Promise.all([
+    getPersonalAccounts(supabase, ctx.userId),
+    ctx.partnershipId ? getSharedAccounts(supabase, ctx.partnershipId) : Promise.resolve([]),
+  ])
+  const allAccounts = [...personalAccounts, ...sharedAccounts]
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -52,8 +80,8 @@ export default async function GoalDetailPage({
 
         <div className="mb-4">
           <div className="flex justify-between text-lg mb-2">
-            <span className="font-bold">¥${goal.current_amount.toFixed(2)}</span>
-            <span className="text-muted-foreground">of ¥${goal.target_amount.toFixed(2)}</span>
+            <span className="font-bold">¥{goal.current_amount.toLocaleString()}</span>
+            <span className="text-muted-foreground">of ¥{goal.target_amount.toLocaleString()}</span>
           </div>
           <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
             <div
@@ -75,34 +103,33 @@ export default async function GoalDetailPage({
       {goal.status === "active" && (
         <div className="rounded-xl border bg-card p-5">
           <h2 className="font-semibold mb-3">Add Contribution</h2>
-          <GoalContributionForm goalId={goal.id} />
+          <GoalContributionForm goalId={goal.id} accounts={allAccounts} />
         </div>
       )}
 
       <div className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold mb-3">Contributions</h2>
-        {!goal.goal_contributions || goal.goal_contributions.length === 0 ? (
+        {sortedContributions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No contributions yet</p>
         ) : (
           <div className="space-y-3">
-            {(goal.goal_contributions as unknown as Array<{
-              id: string; amount: number; note: string | null;
-              created_at: string; user_id: string;
-              profiles: { name: string | null; email: string } | null
-            }>).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                <div>
-                  <p className="text-sm font-medium">
-                    {c.profiles?.name || c.profiles?.email || "Unknown"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(c.created_at).toLocaleDateString()}
-                    {c.note && ` - ${c.note}`}
-                  </p>
+            {sortedContributions.map((c) => {
+              const profile = profileMap.get(c.user_id)
+              return (
+                <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {profile?.name || profile?.email || "Unknown"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(c.created_at).toLocaleDateString()}
+                      {c.note && ` - ${c.note}`}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-green-600">+¥{c.amount.toLocaleString()}</p>
                 </div>
-                <p className="text-sm font-medium text-green-600">+${c.amount.toFixed(2)}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

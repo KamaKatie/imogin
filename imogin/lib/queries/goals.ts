@@ -31,12 +31,11 @@ export async function getGoalById(
   supabase: Supabase,
   goalId: string,
 ) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("goals")
-    .select(
-      `*, goal_contributions(*, profiles!goal_contributions_user_id_fkey(name, email))`,
-    )
+    .select(`*, goal_contributions(*)`)
     .eq("id", goalId)
     .single()
+  if (error) return null
   return data
 }

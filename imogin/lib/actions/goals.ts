@@ -108,15 +108,31 @@ export async function addGoalContribution(goalId: string, formData: FormData) {
 
   const amount = parseFloat(formData.get("amount") as string)
   const note = formData.get("note") as string
+  const accountId = formData.get("account_id") as string | null
 
   const { error: contribError } = await supabase.from("goal_contributions").insert({
     goal_id: goalId,
     user_id: user.id,
     amount,
     note: note || null,
+    account_id: accountId || null,
   })
 
   if (contribError) throw new Error(contribError.message)
+
+  if (accountId) {
+    const { data: account } = await supabase
+      .from("accounts")
+      .select("balance")
+      .eq("id", accountId)
+      .single()
+    if (account) {
+      await supabase
+        .from("accounts")
+        .update({ balance: account.balance - amount, updated_at: new Date().toISOString() })
+        .eq("id", accountId)
+    }
+  }
 
   const { data: goal } = await supabase
     .from("goals")

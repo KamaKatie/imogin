@@ -15,7 +15,7 @@ import { useMonthlyTransactions } from "@/lib/hooks/use-monthly-transactions"
 import Link from "next/link"
 
 export default function DashboardPage() {
-  const { userId, partnershipId, partnerUserId, email } = useAppContext()
+  const { userId, partnershipId, partnerUserId, email, profile } = useAppContext()
 
   const { accounts: personalAccounts, isLoading: personalLoading } = usePersonalAccounts()
   const { accounts: sharedAccounts, isLoading: sharedLoading } = useSharedAccounts()
@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">Welcome back, {partnerProfile?.name || partnerProfile?.email || email}</p>
+      <p className="text-muted-foreground">Welcome back, {profile?.name || profile?.email || email}</p>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border bg-card p-5">
