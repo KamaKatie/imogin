@@ -3,22 +3,22 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { GoalForm } from "@/components/goal-form"
 import { GoalEditDialog } from "@/components/goal-edit-dialog"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function GoalsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId } = ctx
 
   const { data: goals } = await supabase
     .from("goals")
     .select("*")
     .or(
       partnershipId
-        ? `user_id.eq.${user.id},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${user.id}`
+        ? `user_id.eq.${userId},partnership_id.eq.${partnershipId}`
+        : `user_id.eq.${userId}`
     )
     .order("created_at", { ascending: false })
 

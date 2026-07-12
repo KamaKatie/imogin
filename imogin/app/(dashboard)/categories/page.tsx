@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { CategoriesManager } from "@/components/categories-manager"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function CategoriesPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId } = ctx
 
   if (!partnershipId) {
     return (
@@ -24,7 +24,7 @@ export default async function CategoriesPage() {
       .select("id, name, icon, color, type")
       .eq("partnership_id", partnershipId)
       .order("name"),
-    supabase.from("accounts").select("id").eq("user_id", user.id).eq("is_shared", false),
+    supabase.from("accounts").select("id").eq("user_id", userId).eq("is_shared", false),
     supabase.from("accounts").select("id").eq("partnership_id", partnershipId).eq("is_shared", true),
   ])
 

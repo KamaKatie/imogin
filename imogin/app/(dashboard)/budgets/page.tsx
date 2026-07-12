@@ -1,34 +1,37 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { BudgetForm } from "@/components/budget-form"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function BudgetsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
-
-  const { data: categories } = partnershipId ? await supabase
-    .from("categories")
-    .select("id, name, type")
-    .eq("partnership_id", partnershipId) : { data: [] }
-
-  const budgets = await supabase
-    .from("budgets")
-    .select("*, categories(*)")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${user.id}`
-    )
+  const { userId, partnershipId } = ctx
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const categoryIds = (budgets.data || []).map(b => b.category_id).filter(Boolean)
+  const [{ data: categories }, { data: budgets }] = await Promise.all([
+    partnershipId
+      ? supabase
+          .from("categories")
+          .select("id, name, type")
+          .eq("partnership_id", partnershipId)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("budgets")
+      .select("*, categories(*)")
+      .or(
+        partnershipId
+          ? `user_id.eq.${userId},partnership_id.eq.${partnershipId}`
+          : `user_id.eq.${userId}`
+      ),
+  ])
+
+  const categoryIds = (budgets || []).map(b => b.category_id).filter(Boolean)
   const { data: txns } = await supabase
     .from("transactions")
     .select("amount, category_id, user_id")
@@ -37,11 +40,11 @@ export default async function BudgetsPage() {
     .gte("date", firstOfMonth)
     .lte("date", lastOfMonth)
 
-  const budgetsWithSpending = (budgets.data || []).map((budget) => {
+  const budgetsWithSpending = (budgets || []).map((budget) => {
     let spent = 0
     for (const t of txns || []) {
       if (t.category_id !== budget.category_id) continue
-      if (budget.user_id && t.user_id !== user.id) continue
+      if (budget.user_id && t.user_id !== userId) continue
       spent += Math.abs(t.amount)
     }
     return { ...budget, spent }
@@ -129,4 +132,3 @@ export default async function BudgetsPage() {
     </div>
   )
 }
-

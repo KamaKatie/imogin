@@ -2,14 +2,14 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { BillCalendar } from "@/components/bill-calendar"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function BillCalendarPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { partnershipId } = ctx
 
   if (!partnershipId) redirect("/bills")
 

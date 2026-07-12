@@ -3,9 +3,10 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getCategoryIcon } from "@/lib/icons"
-import { getPartnershipId, getAccessibleAccountIds } from "@/lib/queries"
+import { getAccessibleAccountIds } from "@/lib/queries"
 import { LazyCategoryBarChart } from "@/components/lazy-category-chart"
 import { CategoryEditButton } from "@/components/category-edit-button"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function CategoryDetailPage({
   params,
@@ -14,10 +15,10 @@ export default async function CategoryDetailPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId } = ctx
   if (!partnershipId) redirect("/categories")
 
   const { data: category } = await supabase
@@ -29,15 +30,28 @@ export default async function CategoryDetailPage({
 
   if (!category) redirect("/categories")
 
-  const accountIds = await getAccessibleAccountIds(supabase, user.id, partnershipId)
+  const accountIds = await getAccessibleAccountIds(supabase, userId, partnershipId)
 
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select(`*, accounts!account_id(id, name, is_shared)`)
-    .eq("category_id", id)
-    .in("account_id", accountIds)
-    .order("date", { ascending: false })
-    .limit(50)
+  const [transactionsResult, trendResult] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select(`*, accounts!account_id(id, name, is_shared)`)
+      .eq("category_id", id)
+      .in("account_id", accountIds)
+      .order("date", { ascending: false })
+      .limit(50),
+    supabase
+      .from("transactions")
+      .select("amount, type, date")
+      .eq("category_id", id)
+      .in("account_id", accountIds)
+      .gte("date", new Date(new Date().getFullYear(), new Date().getMonth() - 23, 1).toISOString().split("T")[0])
+      .lte("date", new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0])
+      .order("date", { ascending: true }),
+  ])
+
+  const transactions = transactionsResult.data
+  const trendTxns = trendResult.data
 
   const totalIncome = (transactions || [])
     .filter((t) => t.type === "income")
@@ -52,18 +66,6 @@ export default async function CategoryDetailPage({
   const catColor = category.color || "#6B7280"
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth() - 23, 1)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
-  const { data: trendTxns } = await supabase
-    .from("transactions")
-    .select("amount, type, date")
-    .eq("category_id", id)
-    .in("account_id", accountIds)
-    .gte("date", monthStart.toISOString().split("T")[0])
-    .lte("date", monthEnd.toISOString().split("T")[0])
-    .order("date", { ascending: true })
-
   const monthlyTrend: Array<{ label: string; total: number }> = []
 
   if (trendTxns) {

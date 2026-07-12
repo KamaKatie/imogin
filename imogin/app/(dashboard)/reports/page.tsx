@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { LazyMonthlyLineChart } from "@/components/lazy-monthly-chart"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 function getMonthRange() {
   const now = new Date()
@@ -15,25 +15,27 @@ function getMonthRange() {
 
 export default async function ReportsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId } = ctx
 
-  const personalAccountIds = (await supabase
-    .from("accounts")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("is_shared", false)).data?.map(a => a.id) || []
-
-  let sharedAccountIds: string[] = []
-  if (partnershipId) {
-    sharedAccountIds = (await supabase
+  const [personalAccountIds, sharedAccountIds] = await Promise.all([
+    supabase
       .from("accounts")
       .select("id")
-      .eq("partnership_id", partnershipId)
-      .eq("is_shared", true)).data?.map(a => a.id) || []
-  }
+      .eq("user_id", userId)
+      .eq("is_shared", false)
+      .then(r => r.data?.map(a => a.id) || []),
+    partnershipId
+      ? supabase
+          .from("accounts")
+          .select("id")
+          .eq("partnership_id", partnershipId)
+          .eq("is_shared", true)
+          .then(r => r.data?.map(a => a.id) || [])
+      : Promise.resolve([] as string[]),
+  ])
 
   const allIds = [...new Set([...sharedAccountIds, ...personalAccountIds])]
 
@@ -43,23 +45,26 @@ export default async function ReportsPage() {
   const monthlyTrend: Array<{ label: string; totalIncome: number; totalSpent: number }> = []
 
   if (allIds.length > 0) {
-    const { data: accounts } = await supabase
-      .from("accounts")
-      .select("balance")
-      .in("id", allIds)
-    totalBalance = accounts?.reduce((s, a) => s + (a.balance || 0), 0) || 0
-
     const { start, end } = getMonthRange()
 
-    const { data: txns } = await supabase
-      .from("transactions")
-      .select("amount, type, date")
-      .in("account_id", allIds)
-      .gte("date", start)
-      .lte("date", end)
-      .order("date", { ascending: true })
+    const [accountsResult, txnsResult] = await Promise.all([
+      supabase
+        .from("accounts")
+        .select("balance")
+        .in("id", allIds),
+      supabase
+        .from("transactions")
+        .select("amount, type, date")
+        .in("account_id", allIds)
+        .gte("date", start)
+        .lte("date", end)
+        .order("date", { ascending: true }),
+    ])
 
-    if (txns) {
+    totalBalance = accountsResult.data?.reduce((s, a) => s + (a.balance || 0), 0) || 0
+
+    if (txnsResult.data) {
+      const txns = txnsResult.data
       totalSpent = txns.filter(t => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0)
       totalIncome = txns.filter(t => t.type === "income").reduce((s, t) => s + Math.abs(t.amount), 0)
 

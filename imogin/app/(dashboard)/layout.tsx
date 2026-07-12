@@ -3,7 +3,8 @@ import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { PageInfoProvider } from "@/lib/page-info"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
+import { AppContextProvider } from "@/components/app-context-provider"
 
 export default async function DashboardLayout({
   children,
@@ -11,27 +12,22 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const [{ data: profile }, partnershipId] = await Promise.all([
-    supabase.from("profiles").select("name, email, avatar_url").eq("id", user.id).single(),
-    getPartnershipId(supabase, user.id),
-  ])
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
   const { data: accounts } = await supabase
     .from("accounts")
     .select("id, name, balance, icon, type")
     .or(
-      partnershipId
-        ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-        : `user_id.eq.${user.id}`,
+      ctx.partnershipId
+        ? `user_id.eq.${ctx.userId},and(is_shared.eq.true,partnership_id.eq.${ctx.partnershipId})`
+        : `user_id.eq.${ctx.userId}`,
     )
     .order("name")
 
   const sidebarProfile = {
-    name: profile?.name || profile?.email || user.email || "",
-    avatarUrl: profile?.avatar_url || "",
+    name: ctx.profile?.name || ctx.profile?.email || ctx.email || "",
+    avatarUrl: ctx.profile?.avatar_url || "",
   }
 
   return (
@@ -41,7 +37,9 @@ export default async function DashboardLayout({
         <TopBar />
         <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-20 lg:pb-6">
           <PageInfoProvider>
-            {children}
+            <AppContextProvider data={ctx}>
+              {children}
+            </AppContextProvider>
           </PageInfoProvider>
         </main>
       </div>

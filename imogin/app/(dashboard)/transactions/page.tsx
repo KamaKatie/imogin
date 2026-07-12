@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { TransactionForm } from "@/components/transaction-form";
 import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table";
 import { MobileFab } from "@/components/mobile-fab";
-import { getPartnershipId, getPartnerUserId } from "@/lib/queries";
+import { getAppContext } from "@/lib/app-context";
 
 export default async function TransactionsPage({
   searchParams: searchParamsPromise,
@@ -11,11 +11,13 @@ export default async function TransactionsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/login");
+  const [ctx, searchParams] = await Promise.all([
+    getAppContext(supabase),
+    searchParamsPromise,
+  ]);
+  if (!ctx) redirect("/auth/login");
 
-  const partnershipId = await getPartnershipId(supabase, user.id);
-  const searchParams = await searchParamsPromise;
+  const { userId, partnershipId, partnerUserId, profile: userProfile } = ctx;
 
   const page = Math.max(1, parseInt(searchParams.page as string) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.pageSize as string) || 25));
@@ -26,48 +28,34 @@ export default async function TransactionsPage({
   const categoryFilter = (searchParams.category as string) || "";
   const payerFilter = (searchParams.payer as string) || "";
 
-  const { data: accounts } = await supabase
-    .from("accounts")
-    .select("id, name, icon, is_shared, partnership_id, user_id")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-        : `user_id.eq.${user.id}`,
-    );
+  const [accountsResult, categoriesResult, partnerProfileResult] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, name, icon, is_shared, partnership_id, user_id")
+      .or(
+        partnershipId
+          ? `user_id.eq.${userId},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
+          : `user_id.eq.${userId}`,
+      ),
+    partnershipId
+      ? supabase
+          .from("categories")
+          .select("id, name, type, icon, color")
+          .eq("partnership_id", partnershipId)
+      : { data: null },
+    partnerUserId
+      ? supabase
+          .from("profiles")
+          .select("name, email, avatar_url")
+          .eq("id", partnerUserId)
+          .single()
+      : { data: null },
+  ]);
 
-  const allAccounts = accounts || [];
+  const allAccounts = accountsResult.data || [];
   const accessibleAccountIds = allAccounts.map((a) => a.id);
-
-  let categories: { id: string; name: string; type: string; icon: string | null; color: string | null }[] = [];
-  let partnerUserId: string | null = null;
-  let userProfile: { name: string | null; email: string; avatar_url: string | null } | null = null;
-  let partnerProfile: { name: string | null; email: string; avatar_url: string | null } | null = null;
-
-  if (partnershipId) {
-    const { data: catData } = await supabase
-      .from("categories")
-      .select("id, name, type, icon, color")
-      .eq("partnership_id", partnershipId);
-    categories = catData || [];
-
-    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id);
-
-    const { data: up } = await supabase
-      .from("profiles")
-      .select("name, email, avatar_url")
-      .eq("id", user.id)
-      .single();
-    userProfile = up;
-
-    if (partnerUserId) {
-      const { data: pp } = await supabase
-        .from("profiles")
-        .select("name, email, avatar_url")
-        .eq("id", partnerUserId)
-        .single();
-      partnerProfile = pp;
-    }
-  }
+  const categories = categoriesResult.data || [];
+  const partnerProfile = partnerProfileResult.data;
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
@@ -148,7 +136,7 @@ export default async function TransactionsPage({
 
   const filterPayers: FilterOption[] = [];
   if (userProfile) {
-    filterPayers.push({ id: user.id, label: userProfile.name || user.email || "You" });
+    filterPayers.push({ id: userId, label: userProfile.name || userProfile.email || "You" });
   }
   if (partnerProfile && partnerUserId) {
     filterPayers.push({ id: partnerUserId, label: partnerProfile.name || partnerProfile.email || "Partner" });

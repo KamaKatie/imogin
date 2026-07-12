@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function GoalDetailPage({
   params,
@@ -10,8 +11,8 @@ export default async function GoalDetailPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
   const { data: goal } = await supabase
     .from("goals")

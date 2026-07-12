@@ -4,6 +4,7 @@ import { PageBreadcrumbs } from "@/lib/page-info";
 import { getTypeIcon } from "@/lib/icons";
 import { AccountForm } from "@/components/account-form";
 import { DeleteAccountButton } from "@/components/delete-account-button";
+import { getAppContext } from "@/lib/app-context";
 
 export default async function AccountDetailPage({
   params,
@@ -12,10 +13,8 @@ export default async function AccountDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/login");
+  const ctx = await getAppContext(supabase);
+  if (!ctx) redirect("/auth/login");
 
   const { data: account } = await supabase
     .from("accounts")

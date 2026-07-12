@@ -2,34 +2,35 @@
 import { redirect } from "next/navigation"
 import { AccountForm } from "@/components/account-form"
 import { getTypeIcon } from "@/lib/icons"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 import Link from "next/link"
 
 export default async function AccountsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId } = ctx
 
-  const { data: personalAccounts } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("is_shared", false)
-    .order("name")
-
-  let sharedAccounts: Array<{ id: string; name: string; type: string; balance: number; color: string | null; icon: string | null }> = []
-
-  if (partnershipId) {
-    const { data: shared } = await supabase
+  const [personalResult, sharedResult] = await Promise.all([
+    supabase
       .from("accounts")
       .select("*")
-      .eq("partnership_id", partnershipId)
-      .eq("is_shared", true)
-      .order("name")
-    sharedAccounts = shared || []
-  }
+      .eq("user_id", userId)
+      .eq("is_shared", false)
+      .order("name"),
+    partnershipId
+      ? supabase
+          .from("accounts")
+          .select("*")
+          .eq("partnership_id", partnershipId)
+          .eq("is_shared", true)
+          .order("name")
+      : Promise.resolve({ data: null }),
+  ])
+
+  const personalAccounts = personalResult.data
+  const sharedAccounts = sharedResult.data || []
 
   return (
     <div className="space-y-6">

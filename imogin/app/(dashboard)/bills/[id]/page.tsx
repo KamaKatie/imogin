@@ -2,15 +2,15 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getOrdinal } from "@/lib/dates"
-import { getPartnershipId, getPartnerUserId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId, partnerUserId } = ctx
 
   if (!partnershipId) redirect("/bills")
 
@@ -28,27 +28,27 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
 
   if (error || !bill) redirect("/bills")
 
-  const partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id)
+  const [partnerProfile, transactionsResult] = await Promise.all([
+    partnerUserId
+      ? supabase
+          .from("profiles")
+          .select("name")
+          .eq("id", partnerUserId)
+          .single()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("transactions")
+      .select(`
+        *,
+        profiles!inner(name),
+        accounts!inner(name, is_shared)
+      `)
+      .eq("bill_id", id)
+      .order("date", { ascending: false }),
+  ])
 
-  let partnerName: string | null = null
-  if (partnerUserId) {
-    const { data: pp } = await supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", partnerUserId)
-      .single()
-    partnerName = pp?.name || null
-  }
-
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select(`
-      *,
-      profiles!inner(name),
-      accounts!inner(name, is_shared)
-    `)
-    .eq("bill_id", id)
-    .order("date", { ascending: false })
+  const partnerName = partnerProfile?.data?.name || null
+  const transactions = transactionsResult.data
 
   const isOverdue = bill.next_billing_date < new Date().toISOString().split("T")[0]
   const day = bill.due_day || new Date(bill.next_billing_date).getDate()
@@ -59,13 +59,13 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
   const splitLabel = (() => {
     if (!splits || splits.length === 0) {
       if (bill.split_method === "covered") {
-        const payerIsYou = bill.split_payer_user_id === user.id
+        const payerIsYou = bill.split_payer_user_id === userId
         return payerIsYou ? "You pay" : `${partnerName || "Partner"} pays`
       }
       return "Equal (50/50)"
     }
-    const yourSplit = splits.find(s => s.user_id === user.id)
-    const partnerSplit = splits.find(s => s.user_id !== user.id)
+    const yourSplit = splits.find(s => s.user_id === userId)
+    const partnerSplit = splits.find(s => s.user_id !== userId)
     if (yourSplit && partnerSplit) return `You ${yourSplit.percentage}% / ${partnerName || "Partner"} ${partnerSplit.percentage}%`
     return bill.split_method === "equal" ? "Equal (50/50)" : bill.split_method
   })()

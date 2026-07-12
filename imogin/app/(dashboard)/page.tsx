@@ -2,67 +2,54 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { formatRelativeDate, getOrdinal } from "@/lib/dates"
 import { SankeyChart } from "@/components/lazy-sankey"
-
+import { getAppContext } from "@/lib/app-context"
 import Link from "next/link"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
+  const { userId, partnershipId, partnerUserId } = ctx
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  // Batch 1: All independent user data in parallel
-  const [profileResult, membershipResult, personalAccountsResult] = await Promise.all([
-    supabase.from("profiles").select("name, email").eq("id", user.id).single(),
-    supabase.from("partnership_members").select("partnership_id, user_id").eq("user_id", user.id).maybeSingle(),
-    supabase.from("accounts").select("*").eq("user_id", user.id).eq("is_shared", false),
+  // Batch 1: All independent data in parallel
+  const [personalAccountsResult, partnerProfileResult] = await Promise.all([
+    supabase.from("accounts").select("*").eq("user_id", userId).eq("is_shared", false),
+    partnerUserId
+      ? supabase.from("profiles").select("name, email").eq("id", partnerUserId).single()
+      : Promise.resolve({ data: null }),
   ])
 
-  const profile = profileResult.data
-  const displayName = profile?.name || profile?.email || user.email
-  const partnershipId = membershipResult.data?.partnership_id || null
   const personalAccounts = personalAccountsResult.data || []
   const personalBalance = personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
+  const partnerProfile = partnerProfileResult.data
 
-  // Find partner user ID from membership data we already have
-  let partnerUserId: string | null = null
-
-  // Batch 2: Partnership data (all in parallel once we have partnershipId)
-  let partnerProfile: { name: string | null; email: string } | null = null
+  // Batch 2: Partnership data (all in parallel)
   let goals: unknown[] = []
   let bills: unknown[] = []
   let budgets: unknown[] = []
-  let sharedAccounts: unknown[] = []
   let sharedIds: string[] = []
   let partnerOwesMe = 0
   let iOwePartner = 0
 
   if (partnershipId) {
-    const [sharedResult, goalsResult, billsResult, membersResult] = await Promise.all([
-      supabase.from("accounts").select("*").eq("partnership_id", partnershipId).eq("is_shared", true),
+    const [sharedResult, goalsResult, billsResult, budgetsResult] = await Promise.all([
+      supabase.from("accounts").select("id").eq("partnership_id", partnershipId).eq("is_shared", true),
       supabase.from("goals").select("*").eq("partnership_id", partnershipId).eq("status", "active"),
       supabase.from("bills").select("*, categories(name, color)").eq("partnership_id", partnershipId).eq("active", true),
-      supabase.from("partnership_members").select("user_id").eq("partnership_id", partnershipId),
+      supabase.from("budgets").select("*, categories(name, color)").eq("partnership_id", partnershipId),
     ])
 
-    sharedAccounts = sharedResult.data || []
-    sharedIds = sharedAccounts.map(a => (a as { id: string }).id)
+    sharedIds = (sharedResult.data || []).map(a => a.id)
     goals = goalsResult.data || []
     bills = billsResult.data || []
-    partnerUserId = membersResult.data?.find((m) => m.user_id !== user.id)?.user_id || null
+    budgets = budgetsResult.data || []
 
-    // Fetch partner profile + partner user ID in parallel
-    let partnerUserId2 = partnerUserId
-    if (partnerUserId) {
-      const profileRes = await supabase.from("profiles").select("name, email").eq("id", partnerUserId).single()
-      partnerProfile = profileRes.data
-    }
-
-    // Fetch splits separately
-    if (sharedIds.length > 0 && partnerUserId2) {
+    // Fetch splits if there are shared accounts
+    if (sharedIds.length > 0 && partnerUserId) {
       const txRes = await supabase.from("transactions").select("id").in("account_id", sharedIds)
       const txIds = txRes.data?.map(t => t.id) || []
       if (txIds.length > 0) {
@@ -73,8 +60,8 @@ export default async function DashboardPage() {
           .in("transaction_id", txIds)
         if (splitsRes.data) {
           for (const s of splitsRes.data) {
-            if (s.user_id === partnerUserId2) partnerOwesMe += s.amount
-            if (s.user_id === user.id) iOwePartner += s.amount
+            if (s.user_id === partnerUserId) partnerOwesMe += s.amount
+            if (s.user_id === userId) iOwePartner += s.amount
           }
         }
       }
@@ -87,18 +74,18 @@ export default async function DashboardPage() {
     ...sharedIds,
   ]
 
-  const [recentTxnData, monthTxnsResult, budgetsResult] = await Promise.all([
+  const [recentTxnData, monthTxnsResult] = await Promise.all([
     partnershipId && sharedIds.length > 0
       ? supabase
           .from("transactions")
           .select(`*, accounts!account_id!inner(name, is_shared)`)
-          .or(`user_id.eq.${user.id},account_id.in.(${sharedIds.join(",")})`)
+          .or(`user_id.eq.${userId},account_id.in.(${sharedIds.join(",")})`)
           .order("date", { ascending: false })
           .limit(5)
       : supabase
           .from("transactions")
           .select(`*, accounts!account_id!inner(name, is_shared)`)
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("date", { ascending: false })
           .limit(5),
     allAccountIds.length > 0
@@ -109,30 +96,14 @@ export default async function DashboardPage() {
           .gte("date", firstDay)
           .lte("date", lastDay)
       : { data: null },
-    partnershipId
-      ? supabase
-          .from("budgets")
-          .select("*, categories(name, color)")
-          .eq("partnership_id", partnershipId)
-      : { data: null },
   ])
 
   const recentTransactions = recentTxnData.data || []
-  budgets = budgetsResult.data || []
 
   let spendingByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
   let incomeByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
-  let monthlyIncome = 0
-  let monthlyExpenses = 0
 
   if (monthTxnsResult?.data) {
-    monthlyIncome = monthTxnsResult.data
-      .filter(t => t.type === "income")
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    monthlyExpenses = monthTxnsResult.data
-      .filter(t => t.type === "expense")
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
     const catMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
     for (const t of monthTxnsResult.data.filter(t => t.type === "expense")) {
       const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
@@ -159,7 +130,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">Welcome back, {displayName}</p>
+      <p className="text-muted-foreground">Welcome back, {ctx.profile?.name || ctx.profile?.email || ctx.email}</p>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border bg-card p-5">

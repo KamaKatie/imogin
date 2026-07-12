@@ -5,7 +5,7 @@ import { TransactionEditDialog } from "@/components/transaction-edit-dialog";
 import { TransactionDeleteButton } from "@/components/transaction-delete-button";
 import { formatRelativeDate } from "@/lib/dates";
 import { getCategoryIcon } from "@/lib/icons";
-import { getPartnershipId, getPartnerUserId } from "@/lib/queries";
+import { getAppContext } from "@/lib/app-context";
 
 export default async function TransactionDetailPage({
   params,
@@ -14,20 +14,22 @@ export default async function TransactionDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/login");
+  const [ctx, txResult] = await Promise.all([
+    getAppContext(supabase),
+    supabase
+      .from("transactions")
+      .select(
+        "*, accounts!account_id(name, is_shared), categories(name, color, icon)",
+      )
+      .eq("id", id)
+      .single(),
+  ]);
+  if (!ctx) redirect("/auth/login");
 
-  const { data: tx, error } = await supabase
-    .from("transactions")
-    .select(
-      "*, accounts!account_id(name, is_shared), categories(name, color, icon)",
-    )
-    .eq("id", id)
-    .single();
+  const { userId, partnershipId, partnerUserId, profile: userProfile } = ctx;
+  const { data: tx, error: txError } = txResult;
 
-  if (error || !tx) {
+  if (txError || !tx) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Transaction not found</h1>
@@ -35,9 +37,40 @@ export default async function TransactionDetailPage({
     );
   }
 
-  const partnershipId = await getPartnershipId(supabase, user.id);
+  const [accountsResult, categoriesResult, partnerProfileResult, splitsResult] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, name, icon, is_shared")
+      .or(
+        partnershipId
+          ? `user_id.eq.${userId},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
+          : `user_id.eq.${userId}`,
+      )
+      .order("name"),
+    partnershipId
+      ? supabase
+          .from("categories")
+          .select("id, name, type, icon, color")
+          .eq("partnership_id", partnershipId)
+      : { data: null },
+    partnerUserId
+      ? supabase
+          .from("profiles")
+          .select("name, email, avatar_url")
+          .eq("id", partnerUserId)
+          .single()
+      : { data: null },
+    tx.is_split && partnerUserId
+      ? supabase
+          .from("transaction_splits")
+          .select("id, user_id, amount, percentage, settled, settled_at")
+          .eq("transaction_id", id)
+      : { data: null },
+  ]);
 
-  let categories: Array<{ id: string; name: string; type: string; icon: string | null; color: string | null }> = [];
+  const allAccounts = accountsResult.data || [];
+  const categories = categoriesResult.data || [];
+  const partnerProfile = partnerProfileResult.data;
   let splits: Array<{
     id: string;
     user_id: string;
@@ -51,76 +84,24 @@ export default async function TransactionDetailPage({
       avatar_url: string | null;
     } | null;
   }> = [];
-  let partnerUserId: string | null = null;
-  let partnerProfile: {
-    name: string | null;
-    email: string;
-    avatar_url: string | null;
-  } | null = null;
-  let userProfile: {
-    name: string | null;
-    email: string;
-    avatar_url: string | null;
-  } | null = null;
   let forType: "me" | "partner" | "both" = "me";
 
-  const { data: allAccounts } = await supabase
-    .from("accounts")
-    .select("id, name, icon, is_shared")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-        : `user_id.eq.${user.id}`,
-    )
-    .order("name");
+  if (tx.is_split && splitsResult.data) {
+    const rawSplits = splitsResult.data;
 
-  if (partnershipId) {
-    const { data: catData } = await supabase
-      .from("categories")
-      .select("id, name, type, icon, color")
-      .eq("partnership_id", partnershipId);
-    categories = catData || [];
+    const partnerSplit = rawSplits.find((s) => s.user_id === partnerUserId);
+    const mySplit = rawSplits.find((s) => s.user_id === userId);
 
-    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id);
-
-    const { data: up } = await supabase
-      .from("profiles")
-      .select("name, email, avatar_url")
-      .eq("id", user.id)
-      .single();
-    userProfile = up;
-
-    if (partnerUserId) {
-      const { data: pp } = await supabase
-        .from("profiles")
-        .select("name, email, avatar_url")
-        .eq("id", partnerUserId)
-        .single();
-      partnerProfile = pp;
+    if (partnerSplit && partnerSplit.percentage === 100) {
+      forType = "partner";
+    } else if (partnerSplit && mySplit && partnerSplit.percentage === 50) {
+      forType = "both";
     }
 
-    if (tx.is_split) {
-      const { data: splitData } = await supabase
-        .from("transaction_splits")
-        .select("id, user_id, amount, percentage, settled, settled_at")
-        .eq("transaction_id", id);
-
-      const rawSplits = splitData || [];
-
-      const partnerSplit = rawSplits.find((s) => s.user_id === partnerUserId);
-      const mySplit = rawSplits.find((s) => s.user_id === user.id);
-
-      if (partnerSplit && partnerSplit.percentage === 100) {
-        forType = "partner";
-      } else if (partnerSplit && mySplit && partnerSplit.percentage === 50) {
-        forType = "both";
-      }
-
-      splits = rawSplits.map((s) => ({
-        ...s,
-        profiles: s.user_id === partnerUserId ? partnerProfile : userProfile,
-      })) as typeof splits;
-    }
+    splits = rawSplits.map((s) => ({
+      ...s,
+      profiles: s.user_id === partnerUserId ? partnerProfile : userProfile,
+    })) as typeof splits;
   }
 
   const txLabel =

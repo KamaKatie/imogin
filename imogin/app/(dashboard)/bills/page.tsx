@@ -4,7 +4,7 @@ import Link from "next/link"
 import { BillForm } from "@/components/bill-form"
 import { BillEditDialog } from "@/components/bill-edit-dialog"
 import { getOrdinal } from "@/lib/dates"
-import { getPartnershipId, getPartnerUserId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 function formatDueDay(day: number | null, dateStr: string) {
   if (day) return `Due on the ${day}${getOrdinal(day)}`
@@ -14,38 +14,36 @@ function formatDueDay(day: number | null, dateStr: string) {
 
 export default async function BillsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { userId, partnershipId, partnerUserId } = ctx
 
   let accounts: Array<{ id: string; name: string; is_shared: boolean }> = []
   let partnerName: string | null = null
-  let partnerUserId: string | null = null
   let categories: Array<{ id: string; name: string; type: string; color: string | null; icon: string | null }> = []
 
   if (partnershipId) {
-    const { data: catData } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("partnership_id", partnershipId)
-      .eq("type", "expense")
-    categories = catData || []
+    const [catResult, sharedResult, personalResult] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("*")
+        .eq("partnership_id", partnershipId)
+        .eq("type", "expense"),
+      supabase
+        .from("accounts")
+        .select("id, name, is_shared")
+        .eq("partnership_id", partnershipId)
+        .eq("is_shared", true),
+      supabase
+        .from("accounts")
+        .select("id, name, is_shared")
+        .eq("user_id", userId),
+    ])
 
-    const { data: shared } = await supabase
-      .from("accounts")
-      .select("id, name, is_shared")
-      .eq("partnership_id", partnershipId)
-      .eq("is_shared", true)
+    categories = catResult.data || []
+    accounts = [...(personalResult.data || []), ...(sharedResult.data || [])]
 
-    const { data: personal } = await supabase
-      .from("accounts")
-      .select("id, name, is_shared")
-      .eq("user_id", user.id)
-
-    accounts = [...(personal || []), ...(shared || [])]
-
-    partnerUserId = await getPartnerUserId(supabase, partnershipId, user.id)
     if (partnerUserId) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -110,7 +108,7 @@ export default async function BillsPage() {
           <BillForm
             categories={categories || []}
             accounts={accounts}
-            userId={user.id}
+            userId={userId}
             partnerUserId={partnerUserId || undefined}
             partnerName={partnerDisplayName}
           />
@@ -172,7 +170,7 @@ export default async function BillsPage() {
                         }}
                         categories={categories || []}
                         accounts={accounts}
-                        userId={user.id}
+                        userId={userId}
                         partnerUserId={partnerUserId || undefined}
                         partnerName={partnerDisplayName}
                       />

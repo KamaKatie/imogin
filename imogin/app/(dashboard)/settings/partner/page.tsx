@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PartnerSettings } from "@/components/partner-settings"
-import { getPartnershipId } from "@/lib/queries"
+import { getAppContext } from "@/lib/app-context"
 
 export default async function PartnerSettingsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
+  const ctx = await getAppContext(supabase)
+  if (!ctx) redirect("/auth/login")
 
-  const partnershipId = await getPartnershipId(supabase, user.id)
+  const { partnershipId } = ctx
 
   let partnership: {
     id: string
@@ -19,17 +19,18 @@ export default async function PartnerSettingsPage() {
   let members: Array<{ id: string; name: string | null; email: string }> = []
 
   if (partnershipId) {
-    const { data: p } = await supabase
-      .from("partnerships")
-      .select("id, name, share_code, share_code_expires_at")
-      .eq("id", partnershipId)
-      .single()
+    const [{ data: p }, { data: memberRows }] = await Promise.all([
+      supabase
+        .from("partnerships")
+        .select("id, name, share_code, share_code_expires_at")
+        .eq("id", partnershipId)
+        .single(),
+      supabase
+        .from("partnership_members")
+        .select("user_id")
+        .eq("partnership_id", partnershipId),
+    ])
     partnership = p
-
-    const { data: memberRows } = await supabase
-      .from("partnership_members")
-      .select("user_id")
-      .eq("partnership_id", partnershipId)
 
     const userIds = memberRows?.map((m) => m.user_id) || []
     if (userIds.length > 0) {
