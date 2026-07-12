@@ -50,7 +50,10 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="text-xs text-muted-foreground hover:text-foreground">
+        <button
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
           Edit
         </button>
       </DialogTrigger>
