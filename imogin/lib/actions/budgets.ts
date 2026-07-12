@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BudgetPeriod } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
+import { getBudgetsWithCategories, getBudgetSpending } from "@/lib/queries/budgets"
 
 export async function getBudgets() {
   const supabase = await createClient()
@@ -12,16 +13,7 @@ export async function getBudgets() {
 
   const partnershipId = await getPartnershipId(supabase, user.id)
 
-  const { data } = await supabase
-    .from("budgets")
-    .select("*, categories(*)")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${user.id}`
-    )
-
-  return data || []
+  return await getBudgetsWithCategories(supabase, user.id, partnershipId)
 }
 
 export async function getBudgetWithSpending() {
@@ -31,31 +23,18 @@ export async function getBudgetWithSpending() {
 
   const partnershipId = await getPartnershipId(supabase, user.id)
 
-  const budgets = await supabase
-    .from("budgets")
-    .select("*, categories(*)")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${user.id}`
-    )
+  const budgets = await getBudgetsWithCategories(supabase, user.id, partnershipId)
 
-  if (!budgets.data) return []
+  if (!budgets || budgets.length === 0) return []
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const categoryIds = budgets.data.map(b => b.category_id).filter(Boolean)
-  const { data: txns } = await supabase
-    .from("transactions")
-    .select("amount, category_id, user_id")
-    .in("category_id", categoryIds)
-    .eq("type", "expense")
-    .gte("date", firstOfMonth)
-    .lte("date", lastOfMonth)
+  const categoryIds = budgets.map(b => b.category_id).filter(Boolean)
+  const txns = await getBudgetSpending(supabase, categoryIds, firstOfMonth, lastOfMonth)
 
-  const budgetsWithSpending = budgets.data.map((budget) => {
+  const budgetsWithSpending = budgets.map((budget) => {
     let spent = 0
     for (const t of txns || []) {
       if (t.category_id !== budget.category_id) continue

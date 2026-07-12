@@ -5,6 +5,9 @@ import { getTypeIcon } from "@/lib/icons";
 import { AccountForm } from "@/components/account-form";
 import { DeleteAccountButton } from "@/components/delete-account-button";
 import { getAppContext } from "@/lib/app-context";
+import { getAccountById } from "@/lib/queries/accounts";
+import { getTransactionsForAccount } from "@/lib/queries/transactions";
+import type { Account } from "@/lib/supabase/types-extension";
 
 export default async function AccountDetailPage({
   params,
@@ -16,11 +19,7 @@ export default async function AccountDetailPage({
   const ctx = await getAppContext(supabase);
   if (!ctx) redirect("/auth/login");
 
-  const { data: account } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const account = await getAccountById(supabase, id);
 
   if (!account) {
     return (
@@ -30,12 +29,7 @@ export default async function AccountDetailPage({
     );
   }
 
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select("*, categories(name, color)")
-    .eq("account_id", id)
-    .order("date", { ascending: false })
-    .limit(50);
+  const transactions = await getTransactionsForAccount(supabase, id);
 
   return (
     <div className="space-y-6">
@@ -58,7 +52,7 @@ export default async function AccountDetailPage({
           <div className="flex items-center gap-2">
             <AccountForm
               hasPartner={false}
-              account={account}
+              account={account as Account}
               trigger={
                 <button className="inline-flex items-center justify-center rounded-lg border bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
                   Edit

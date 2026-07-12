@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getOrdinal } from "@/lib/dates"
 import { getAppContext } from "@/lib/app-context"
+import { getBillById } from "@/lib/queries/bills"
+import { getPartnerProfile } from "@/lib/queries/profiles"
 
 export default async function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -14,28 +16,14 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
 
   if (!partnershipId) redirect("/bills")
 
-  const { data: bill, error } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(name, color, icon),
-      accounts(name, is_shared),
-      bill_splits(user_id, percentage)
-    `)
-    .eq("id", id)
-    .eq("partnership_id", partnershipId)
-    .single()
+  const bill = await getBillById(supabase, id, partnershipId)
 
-  if (error || !bill) redirect("/bills")
+  if (!bill) redirect("/bills")
 
   const [partnerProfile, transactionsResult] = await Promise.all([
     partnerUserId
-      ? supabase
-          .from("profiles")
-          .select("name")
-          .eq("id", partnerUserId)
-          .single()
-      : Promise.resolve({ data: null }),
+      ? getPartnerProfile(supabase, partnerUserId)
+      : Promise.resolve(null),
     supabase
       .from("transactions")
       .select(`
@@ -47,7 +35,7 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
       .order("date", { ascending: false }),
   ])
 
-  const partnerName = partnerProfile?.data?.name || null
+  const partnerName = partnerProfile?.name || null
   const transactions = transactionsResult.data
 
   const isOverdue = bill.next_billing_date < new Date().toISOString().split("T")[0]

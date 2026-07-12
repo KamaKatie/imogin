@@ -5,6 +5,10 @@ import { BillForm } from "@/components/bill-form"
 import { BillEditDialog } from "@/components/bill-edit-dialog"
 import { getOrdinal } from "@/lib/dates"
 import { getAppContext } from "@/lib/app-context"
+import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
+import { getPartnershipCategories } from "@/lib/queries/categories"
+import { getPartnerProfile } from "@/lib/queries/profiles"
+import { getActiveBills } from "@/lib/queries/bills"
 
 function formatDueDay(day: number | null, dateStr: string) {
   if (day) return `Due on the ${day}${getOrdinal(day)}`
@@ -24,32 +28,17 @@ export default async function BillsPage() {
   let categories: Array<{ id: string; name: string; type: string; color: string | null; icon: string | null }> = []
 
   if (partnershipId) {
-    const [catResult, sharedResult, personalResult] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("*")
-        .eq("partnership_id", partnershipId)
-        .eq("type", "expense"),
-      supabase
-        .from("accounts")
-        .select("id, name, is_shared")
-        .eq("partnership_id", partnershipId)
-        .eq("is_shared", true),
-      supabase
-        .from("accounts")
-        .select("id, name, is_shared")
-        .eq("user_id", userId),
+    const [catResult, sharedAccounts, personalAccounts] = await Promise.all([
+      getPartnershipCategories(supabase, partnershipId),
+      getSharedAccounts(supabase, partnershipId),
+      getPersonalAccounts(supabase, userId),
     ])
 
-    categories = catResult.data || []
-    accounts = [...(personalResult.data || []), ...(sharedResult.data || [])]
+    categories = catResult
+    accounts = [...personalAccounts, ...sharedAccounts]
 
     if (partnerUserId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", partnerUserId)
-        .single()
+      const profile = await getPartnerProfile(supabase, partnerUserId)
       partnerName = profile?.name || null
     }
   }
@@ -70,16 +59,7 @@ export default async function BillsPage() {
     )
   }
 
-  const { data: bills } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(name, color),
-      accounts(name)
-    `)
-    .eq("partnership_id", partnershipId)
-    .eq("active", true)
-    .order("next_billing_date")
+  const bills = await getActiveBills(supabase, partnershipId)
 
   const totalMonthly = bills?.reduce((sum, s) => {
     const amount = Math.abs(s.amount)

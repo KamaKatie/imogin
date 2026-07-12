@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Bill } from "@/lib/supabase/types-extension";
 
-interface BillWithCategory extends Bill {
+export interface BillWithCategory extends Bill {
   categories: { name: string; color: string | null } | null;
 }
 

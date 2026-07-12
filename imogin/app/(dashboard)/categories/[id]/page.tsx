@@ -3,7 +3,8 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { getCategoryIcon } from "@/lib/icons"
-import { getAccessibleAccountIds } from "@/lib/queries"
+import { getAccessibleAccountIds } from "@/lib/queries/accounts"
+import { getCategoryById } from "@/lib/queries/categories"
 import { LazyCategoryBarChart } from "@/components/lazy-category-chart"
 import { CategoryEditButton } from "@/components/category-edit-button"
 import { getAppContext } from "@/lib/app-context"
@@ -21,12 +22,7 @@ export default async function CategoryDetailPage({
   const { userId, partnershipId } = ctx
   if (!partnershipId) redirect("/categories")
 
-  const { data: category } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("id", id)
-    .eq("partnership_id", partnershipId)
-    .single()
+  const category = await getCategoryById(supabase, id, partnershipId)
 
   if (!category) redirect("/categories")
 

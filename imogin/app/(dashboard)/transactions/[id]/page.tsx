@@ -6,6 +6,9 @@ import { TransactionDeleteButton } from "@/components/transaction-delete-button"
 import { formatRelativeDate } from "@/lib/dates";
 import { getCategoryIcon } from "@/lib/icons";
 import { getAppContext } from "@/lib/app-context";
+import { getAccessibleAccounts } from "@/lib/queries/accounts";
+import { getPartnershipCategories } from "@/lib/queries/categories";
+import { getPartnerProfile } from "@/lib/queries/profiles";
 
 export default async function TransactionDetailPage({
   params,
@@ -37,29 +40,14 @@ export default async function TransactionDetailPage({
     );
   }
 
-  const [accountsResult, categoriesResult, partnerProfileResult, splitsResult] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id, name, icon, is_shared")
-      .or(
-        partnershipId
-          ? `user_id.eq.${userId},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-          : `user_id.eq.${userId}`,
-      )
-      .order("name"),
+  const [allAccounts, categories, partnerProfile, splitsResult] = await Promise.all([
+    getAccessibleAccounts(supabase, userId, partnershipId),
     partnershipId
-      ? supabase
-          .from("categories")
-          .select("id, name, type, icon, color")
-          .eq("partnership_id", partnershipId)
-      : { data: null },
+      ? getPartnershipCategories(supabase, partnershipId)
+      : Promise.resolve([]),
     partnerUserId
-      ? supabase
-          .from("profiles")
-          .select("name, email, avatar_url")
-          .eq("id", partnerUserId)
-          .single()
-      : { data: null },
+      ? getPartnerProfile(supabase, partnerUserId)
+      : Promise.resolve(null),
     tx.is_split && partnerUserId
       ? supabase
           .from("transaction_splits")
@@ -67,10 +55,6 @@ export default async function TransactionDetailPage({
           .eq("transaction_id", id)
       : { data: null },
   ]);
-
-  const allAccounts = accountsResult.data || [];
-  const categories = categoriesResult.data || [];
-  const partnerProfile = partnerProfileResult.data;
   let splits: Array<{
     id: string;
     user_id: string;

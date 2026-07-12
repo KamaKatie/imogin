@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { getPartnershipId, getAccessibleAccountIds } from "@/lib/queries"
+import { getPartnershipId } from "@/lib/queries"
+import { getAccessibleAccountIds } from "@/lib/queries/accounts"
 
 export async function getMonthlySpending(year: number, month: number) {
   const supabase = await createClient()

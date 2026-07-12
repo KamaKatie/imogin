@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { LazyMonthlyLineChart } from "@/components/lazy-monthly-chart"
 import { getAppContext } from "@/lib/app-context"
+import { getAccessibleAccountIds } from "@/lib/queries/accounts"
 
 function getMonthRange() {
   const now = new Date()
@@ -20,24 +21,7 @@ export default async function ReportsPage() {
 
   const { userId, partnershipId } = ctx
 
-  const [personalAccountIds, sharedAccountIds] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("is_shared", false)
-      .then(r => r.data?.map(a => a.id) || []),
-    partnershipId
-      ? supabase
-          .from("accounts")
-          .select("id")
-          .eq("partnership_id", partnershipId)
-          .eq("is_shared", true)
-          .then(r => r.data?.map(a => a.id) || [])
-      : Promise.resolve([] as string[]),
-  ])
-
-  const allIds = [...new Set([...sharedAccountIds, ...personalAccountIds])]
+  const allIds = await getAccessibleAccountIds(supabase, userId, partnershipId)
 
   let totalBalance = 0
   let totalSpent = 0

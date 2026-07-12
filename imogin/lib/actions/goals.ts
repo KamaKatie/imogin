@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getPartnershipId } from "@/lib/queries"
+import { getPartnershipGoals, getGoalById } from "@/lib/queries/goals"
 
 export async function getGoals() {
   const supabase = await createClient()
@@ -11,16 +12,7 @@ export async function getGoals() {
 
   const partnershipId = await getPartnershipId(supabase, user.id)
 
-  const { data } = await supabase
-    .from("goals")
-    .select("*, goal_contributions(*)")
-    .or(
-      partnershipId
-        ? `user_id.eq.${user.id},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${user.id}`
-    )
-
-  return data || []
+  return await getPartnershipGoals(supabase, user.id, partnershipId)
 }
 
 export async function getGoal(id: string) {
@@ -28,19 +20,7 @@ export async function getGoal(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data } = await supabase
-    .from("goals")
-    .select(`
-      *,
-      goal_contributions(
-        *,
-        profiles!goal_contributions_user_id_fkey(name, email)
-      )
-    `)
-    .eq("id", id)
-    .single()
-
-  return data
+  return await getGoalById(supabase, id)
 }
 
 export async function createGoal(formData: FormData) {

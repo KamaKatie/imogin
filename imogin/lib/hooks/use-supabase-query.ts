@@ -76,11 +76,11 @@ export function useSupabaseQuery<T>(
 
 export function useSupabaseFetch<T>(
   key: string,
-  fetcher: () => Promise<T>,
+  fetcher: (() => Promise<T>) | null,
   options?: { revalidateOnFocus?: boolean; dedupingInterval?: number },
 ) {
   return useSWR<T>(
-    key,
+    fetcher ? key : null,
     fetcher,
     {
       revalidateOnFocus: options?.revalidateOnFocus ?? false,

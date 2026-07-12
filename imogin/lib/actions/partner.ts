@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import crypto from "crypto"
+import { getPartnershipDetails, getPartnershipMembers } from "@/lib/queries/partnerships"
+import { getProfilesByIds } from "@/lib/queries/profiles"
 
 export async function getPartnership() {
   const supabase = await createClient()
@@ -17,29 +19,15 @@ export async function getPartnership() {
 
   if (!membership) return null
 
-  const partnershipId = membership.partnership_id
-
-  const { data: partnership } = await supabase
-    .from("partnerships")
-    .select("*")
-    .eq("id", partnershipId)
-    .single()
-
+  const partnership = await getPartnershipDetails(supabase, membership.partnership_id)
   if (!partnership) return null
 
-  const { data: memberRows } = await supabase
-    .from("partnership_members")
-    .select("user_id, joined_at")
-    .eq("partnership_id", partnershipId)
+  const memberRows = await getPartnershipMembers(supabase, membership.partnership_id) || []
 
-  const userIds = memberRows?.map((m) => m.user_id) || []
+  const userIds = memberRows.map((m) => m.user_id) || []
   let profiles: Array<{ id: string; name: string | null; email: string }> = []
   if (userIds.length > 0) {
-    const { data: p } = await supabase
-      .from("profiles")
-      .select("id, name, email")
-      .in("id", userIds)
-    profiles = p || []
+    profiles = await getProfilesByIds(supabase, userIds) || []
   }
 
   return { partnership, members: profiles }

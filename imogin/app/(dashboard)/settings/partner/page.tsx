@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { PartnerSettings } from "@/components/partner-settings"
 import { getAppContext } from "@/lib/app-context"
+import { getPartnershipDetails, getPartnershipMembers } from "@/lib/queries/partnerships"
+import { getProfilesByIds } from "@/lib/queries/profiles"
 
 export default async function PartnerSettingsPage() {
   const supabase = await createClient()
@@ -19,25 +21,15 @@ export default async function PartnerSettingsPage() {
   let members: Array<{ id: string; name: string | null; email: string }> = []
 
   if (partnershipId) {
-    const [{ data: p }, { data: memberRows }] = await Promise.all([
-      supabase
-        .from("partnerships")
-        .select("id, name, share_code, share_code_expires_at")
-        .eq("id", partnershipId)
-        .single(),
-      supabase
-        .from("partnership_members")
-        .select("user_id")
-        .eq("partnership_id", partnershipId),
+    const [p, memberRows] = await Promise.all([
+      getPartnershipDetails(supabase, partnershipId),
+      getPartnershipMembers(supabase, partnershipId),
     ])
     partnership = p
 
     const userIds = memberRows?.map((m) => m.user_id) || []
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, name, email")
-        .in("id", userIds)
+      const profiles = await getProfilesByIds(supabase, userIds)
       members = (profiles || []).map((pr) => ({ id: pr.id, name: pr.name, email: pr.email }))
     }
   }

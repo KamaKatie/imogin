@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { TransactionType } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
+import { getTransactionById } from "@/lib/queries/transactions"
 
 async function adjustBalance(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -68,18 +69,7 @@ export async function getTransactions(accountId?: string) {
 
 export async function getTransaction(id: string) {
   const supabase = await createClient()
-  const { data } = await supabase
-    .from("transactions")
-    .select(`
-      *,
-      accounts!account_id(*),
-      categories(*),
-      transaction_splits(*)
-    `)
-    .eq("id", id)
-    .single()
-
-  return data
+  return await getTransactionById(supabase, id)
 }
 
 export async function createTransaction(formData: FormData) {

@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { BudgetForm } from "@/components/budget-form"
 import { getAppContext } from "@/lib/app-context"
+import { getPartnershipCategories } from "@/lib/queries/categories"
+import { getBudgetsWithCategories, getBudgetSpending } from "@/lib/queries/budgets"
 
 export default async function BudgetsPage() {
   const supabase = await createClient()
@@ -14,31 +16,13 @@ export default async function BudgetsPage() {
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const [{ data: categories }, { data: budgets }] = await Promise.all([
-    partnershipId
-      ? supabase
-          .from("categories")
-          .select("id, name, type")
-          .eq("partnership_id", partnershipId)
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("budgets")
-      .select("*, categories(*)")
-      .or(
-        partnershipId
-          ? `user_id.eq.${userId},partnership_id.eq.${partnershipId}`
-          : `user_id.eq.${userId}`
-      ),
+  const [categories, budgets] = await Promise.all([
+    getPartnershipCategories(supabase, partnershipId),
+    getBudgetsWithCategories(supabase, userId, partnershipId),
   ])
 
   const categoryIds = (budgets || []).map(b => b.category_id).filter(Boolean)
-  const { data: txns } = await supabase
-    .from("transactions")
-    .select("amount, category_id, user_id")
-    .in("category_id", categoryIds)
-    .eq("type", "expense")
-    .gte("date", firstOfMonth)
-    .lte("date", lastOfMonth)
+  const txns = await getBudgetSpending(supabase, categoryIds, firstOfMonth, lastOfMonth)
 
   const budgetsWithSpending = (budgets || []).map((budget) => {
     let spent = 0

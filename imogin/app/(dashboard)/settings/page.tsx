@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation"
 import { ProfileForm } from "@/components/profile-form"
 import { getAppContext } from "@/lib/app-context"
+import { getProfileById } from "@/lib/queries/profiles"
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -10,11 +11,7 @@ export default async function SettingsPage() {
 
   const { userId } = ctx
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single()
+  const profile = await getProfileById(supabase, userId)
 
   return (
     <div className="space-y-4">

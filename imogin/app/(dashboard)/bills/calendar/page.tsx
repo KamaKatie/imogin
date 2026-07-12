@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { BillCalendar } from "@/components/bill-calendar"
+import { BillCalendar, type BillWithCategory } from "@/components/bill-calendar"
 import { getAppContext } from "@/lib/app-context"
+import { getActiveBills } from "@/lib/queries/bills"
 
 export default async function BillCalendarPage() {
   const supabase = await createClient()
@@ -13,15 +14,7 @@ export default async function BillCalendarPage() {
 
   if (!partnershipId) redirect("/bills")
 
-  const { data: bills } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(name, color)
-    `)
-    .eq("partnership_id", partnershipId)
-    .eq("active", true)
-    .order("next_billing_date")
+  const bills = await getActiveBills(supabase, partnershipId)
 
   return (
     <div className="space-y-6">
@@ -35,7 +28,7 @@ export default async function BillCalendarPage() {
         </Link>
       </div>
 
-      <BillCalendar bills={bills || []} />
+      <BillCalendar bills={(bills || []) as BillWithCategory[]} />
     </div>
   )
 }

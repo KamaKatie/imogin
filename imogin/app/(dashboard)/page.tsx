@@ -4,6 +4,11 @@ import { formatRelativeDate, getOrdinal } from "@/lib/dates"
 import { SankeyChart } from "@/components/lazy-sankey"
 import { getAppContext } from "@/lib/app-context"
 import Link from "next/link"
+import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
+import { getPartnerProfile } from "@/lib/queries/profiles"
+import { getPartnershipGoals } from "@/lib/queries/goals"
+import { getActiveBills } from "@/lib/queries/bills"
+import { getBudgetsWithCategories } from "@/lib/queries/budgets"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -16,37 +21,36 @@ export default async function DashboardPage() {
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
   // Batch 1: All independent data in parallel
-  const [personalAccountsResult, partnerProfileResult] = await Promise.all([
-    supabase.from("accounts").select("*").eq("user_id", userId).eq("is_shared", false),
-    partnerUserId
-      ? supabase.from("profiles").select("name, email").eq("id", partnerUserId).single()
-      : Promise.resolve({ data: null }),
+  const [personalAccounts, partnerProfile] = await Promise.all([
+    getPersonalAccounts(supabase, userId),
+      partnerUserId
+      ? getPartnerProfile(supabase, partnerUserId)
+      : Promise.resolve(null),
   ])
 
-  const personalAccounts = personalAccountsResult.data || []
   const personalBalance = personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
-  const partnerProfile = partnerProfileResult.data
 
   // Batch 2: Partnership data (all in parallel)
-  let goals: unknown[] = []
-  let bills: unknown[] = []
-  let budgets: unknown[] = []
   let sharedIds: string[] = []
   let partnerOwesMe = 0
   let iOwePartner = 0
 
+  let goals: unknown[] = []
+  let bills: unknown[] = []
+  let budgets: unknown[] = []
+
   if (partnershipId) {
-    const [sharedResult, goalsResult, billsResult, budgetsResult] = await Promise.all([
-      supabase.from("accounts").select("id").eq("partnership_id", partnershipId).eq("is_shared", true),
-      supabase.from("goals").select("*").eq("partnership_id", partnershipId).eq("status", "active"),
-      supabase.from("bills").select("*, categories(name, color)").eq("partnership_id", partnershipId).eq("active", true),
-      supabase.from("budgets").select("*, categories(name, color)").eq("partnership_id", partnershipId),
+    const [sharedAccounts, goalsResult, billsResult, budgetsResult] = await Promise.all([
+      getSharedAccounts(supabase, partnershipId),
+      getPartnershipGoals(supabase, userId, partnershipId),
+      getActiveBills(supabase, partnershipId),
+      getBudgetsWithCategories(supabase, userId, partnershipId),
     ])
 
-    sharedIds = (sharedResult.data || []).map(a => a.id)
-    goals = goalsResult.data || []
-    bills = billsResult.data || []
-    budgets = budgetsResult.data || []
+    sharedIds = sharedAccounts.map(a => a.id)
+    goals = goalsResult
+    bills = billsResult
+    budgets = budgetsResult
 
     // Fetch splits if there are shared accounts
     if (sharedIds.length > 0 && partnerUserId) {

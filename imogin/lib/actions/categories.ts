@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { CategoryType } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
+import { getPartnershipCategories } from "@/lib/queries/categories"
 
 export async function getCategories() {
   const supabase = await createClient()
@@ -13,12 +14,7 @@ export async function getCategories() {
   const partnershipId = await getPartnershipId(supabase, user.id)
   if (!partnershipId) return []
 
-  const { data } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("partnership_id", partnershipId)
-
-  return data || []
+  return await getPartnershipCategories(supabase, partnershipId) || []
 }
 
 export async function createCategory(formData: FormData) {

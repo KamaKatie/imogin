@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BillingCycle, SplitMethod } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
+import { getActiveBills, getBillById } from "@/lib/queries/bills"
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -67,18 +68,7 @@ export async function getBills() {
   const partnershipId = await getPartnershipId(supabase, user.id)
   if (!partnershipId) return []
 
-  const { data } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(*),
-      accounts(*),
-      bill_splits(*)
-    `)
-    .eq("partnership_id", partnershipId)
-    .eq("active", true)
-
-  return data || []
+  return await getActiveBills(supabase, partnershipId)
 }
 
 export async function getBill(id: string) {
@@ -86,18 +76,7 @@ export async function getBill(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(*),
-      accounts(*),
-      bill_splits(*)
-    `)
-    .eq("id", id)
-    .single()
-
-  return data
+  return await getBillById(supabase, id)
 }
 
 export async function getBillWithDetails(id: string) {
@@ -105,16 +84,7 @@ export async function getBillWithDetails(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: bill } = await supabase
-    .from("bills")
-    .select(`
-      *,
-      categories(name, color, icon),
-      accounts(name, is_shared),
-      bill_splits(user_id, percentage)
-    `)
-    .eq("id", id)
-    .single()
+  const bill = await getBillById(supabase, id)
 
   if (!bill) return null
 

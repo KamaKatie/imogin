@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { AccountType } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
+import { getPersonalAccounts, getSharedAccounts, getAccountById } from "@/lib/queries/accounts"
 
 export async function getAccounts() {
   const supabase = await createClient()
@@ -13,37 +14,18 @@ export async function getAccounts() {
   const partnershipId = await getPartnershipId(supabase, user.id)
 
   if (partnershipId) {
-    const { data: shared } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("partnership_id", partnershipId)
-      .eq("is_shared", true)
-
-    const { data: personal } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("user_id", user.id)
+    const shared = await getSharedAccounts(supabase, partnershipId)
+    const personal = await getPersonalAccounts(supabase, user.id)
 
     return [...(personal || []), ...(shared || [])]
   }
 
-  const { data } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("user_id", user.id)
-
-  return data || []
+  return await getPersonalAccounts(supabase, user.id)
 }
 
 export async function getAccount(id: string) {
   const supabase = await createClient()
-  const { data } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("id", id)
-    .single()
-
-  return data
+  return await getAccountById(supabase, id)
 }
 
 const STORAGE_BASE = "https://jjojwvdtwtodapqszizc.supabase.co/storage/v1/object/public/account_icons/"

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { GoalForm } from "@/components/goal-form"
 import { GoalEditDialog } from "@/components/goal-edit-dialog"
 import { getAppContext } from "@/lib/app-context"
+import { getPartnershipGoals } from "@/lib/queries/goals"
 
 export default async function GoalsPage() {
   const supabase = await createClient()
@@ -12,15 +13,7 @@ export default async function GoalsPage() {
 
   const { userId, partnershipId } = ctx
 
-  const { data: goals } = await supabase
-    .from("goals")
-    .select("*")
-    .or(
-      partnershipId
-        ? `user_id.eq.${userId},partnership_id.eq.${partnershipId}`
-        : `user_id.eq.${userId}`
-    )
-    .order("created_at", { ascending: false })
+  const goals = await getPartnershipGoals(supabase, userId, partnershipId)
 
   return (
     <div className="space-y-6">

@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { CategoriesManager } from "@/components/categories-manager"
 import { getAppContext } from "@/lib/app-context"
+import { getPartnershipCategories } from "@/lib/queries/categories"
+import { getAccessibleAccountIds } from "@/lib/queries/accounts"
 
 export default async function CategoriesPage() {
   const supabase = await createClient()
@@ -18,19 +20,10 @@ export default async function CategoriesPage() {
     )
   }
 
-  const [{ data: categories }, personalAccountsResult, sharedResult] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, icon, color, type")
-      .eq("partnership_id", partnershipId)
-      .order("name"),
-    supabase.from("accounts").select("id").eq("user_id", userId).eq("is_shared", false),
-    supabase.from("accounts").select("id").eq("partnership_id", partnershipId).eq("is_shared", true),
+  const [categories, allAccountIds] = await Promise.all([
+    getPartnershipCategories(supabase, partnershipId),
+    getAccessibleAccountIds(supabase, userId, partnershipId),
   ])
-
-  const personalAccountIds = personalAccountsResult.data?.map(a => a.id) || []
-  const sharedAccountIds = sharedResult.data?.map(a => a.id) || []
-  const allAccountIds = [...personalAccountIds, ...sharedAccountIds]
 
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]

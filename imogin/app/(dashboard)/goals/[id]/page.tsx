@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
 import { getAppContext } from "@/lib/app-context"
+import { getGoalById } from "@/lib/queries/goals"
 
 export default async function GoalDetailPage({
   params,
@@ -14,17 +15,7 @@ export default async function GoalDetailPage({
   const ctx = await getAppContext(supabase)
   if (!ctx) redirect("/auth/login")
 
-  const { data: goal } = await supabase
-    .from("goals")
-    .select(`
-      *,
-      goal_contributions(
-        *,
-        profiles!goal_contributions_user_id_fkey(name, email)
-      )
-    `)
-    .eq("id", id)
-    .single()
+  const goal = await getGoalById(supabase, id)
 
   if (!goal) {
     return (
@@ -94,7 +85,7 @@ export default async function GoalDetailPage({
           <p className="text-sm text-muted-foreground">No contributions yet</p>
         ) : (
           <div className="space-y-3">
-            {(goal.goal_contributions as Array<{
+            {(goal.goal_contributions as unknown as Array<{
               id: string; amount: number; note: string | null;
               created_at: string; user_id: string;
               profiles: { name: string | null; email: string } | null

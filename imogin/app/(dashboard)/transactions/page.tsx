@@ -4,6 +4,9 @@ import { TransactionForm } from "@/components/transaction-form";
 import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table";
 import { MobileFab } from "@/components/mobile-fab";
 import { getAppContext } from "@/lib/app-context";
+import { getAccessibleAccounts } from "@/lib/queries/accounts";
+import { getPartnershipCategories } from "@/lib/queries/categories";
+import { getPartnerProfile, getProfilesByIds } from "@/lib/queries/profiles";
 
 export default async function TransactionsPage({
   searchParams: searchParamsPromise,
@@ -28,34 +31,17 @@ export default async function TransactionsPage({
   const categoryFilter = (searchParams.category as string) || "";
   const payerFilter = (searchParams.payer as string) || "";
 
-  const [accountsResult, categoriesResult, partnerProfileResult] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id, name, icon, is_shared, partnership_id, user_id")
-      .or(
-        partnershipId
-          ? `user_id.eq.${userId},and(is_shared.eq.true,partnership_id.eq.${partnershipId})`
-          : `user_id.eq.${userId}`,
-      ),
+  const [allAccounts, categories, partnerProfile] = await Promise.all([
+    getAccessibleAccounts(supabase, userId, partnershipId),
     partnershipId
-      ? supabase
-          .from("categories")
-          .select("id, name, type, icon, color")
-          .eq("partnership_id", partnershipId)
-      : { data: null },
+      ? getPartnershipCategories(supabase, partnershipId)
+      : Promise.resolve([]),
     partnerUserId
-      ? supabase
-          .from("profiles")
-          .select("name, email, avatar_url")
-          .eq("id", partnerUserId)
-          .single()
-      : { data: null },
+      ? getPartnerProfile(supabase, partnerUserId)
+      : Promise.resolve(null),
   ]);
 
-  const allAccounts = accountsResult.data || [];
   const accessibleAccountIds = allAccounts.map((a) => a.id);
-  const categories = categoriesResult.data || [];
-  const partnerProfile = partnerProfileResult.data;
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
@@ -96,14 +82,9 @@ export default async function TransactionsPage({
   const profileMap = new Map<string, string>();
 
   if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, name")
-      .in("id", userIds);
-    if (profiles) {
-      for (const p of profiles) {
-        profileMap.set(p.id, p.name || p.id);
-      }
+    const profiles = await getProfilesByIds(supabase, userIds);
+    for (const p of profiles) {
+      profileMap.set(p.id, p.name || p.id);
     }
   }
 

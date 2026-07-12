@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables, TablesUpdate } from "@/lib/supabase/types";
 import { redirect } from "next/navigation";
+import { getProfileById } from "@/lib/queries/profiles";
 
 export async function getProfile(): Promise<Tables<"profiles"> | null> {
   const supabase = await createClient();
@@ -12,13 +13,7 @@ export async function getProfile(): Promise<Tables<"profiles"> | null> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  return data;
+  return await getProfileById(supabase, user.id);
 }
 
 export async function updateProfile(values: TablesUpdate<"profiles">) {
