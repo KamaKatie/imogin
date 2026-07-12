@@ -3,35 +3,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import crypto from "crypto"
-import { getPartnershipDetails, getPartnershipMembers } from "@/lib/queries/partnerships"
-import { getProfilesByIds } from "@/lib/queries/profiles"
-
-export async function getPartnership() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: membership } = await supabase
-    .from("partnership_members")
-    .select("partnership_id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (!membership) return null
-
-  const partnership = await getPartnershipDetails(supabase, membership.partnership_id)
-  if (!partnership) return null
-
-  const memberRows = await getPartnershipMembers(supabase, membership.partnership_id) || []
-
-  const userIds = memberRows.map((m) => m.user_id) || []
-  let profiles: Array<{ id: string; name: string | null; email: string }> = []
-  if (userIds.length > 0) {
-    profiles = await getProfilesByIds(supabase, userIds) || []
-  }
-
-  return { partnership, members: profiles }
-}
 
 export async function createPartnership() {
   const supabase = await createClient()

@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { PageBreadcrumbs } from "@/lib/page-info";
-import { getTypeIcon } from "@/lib/icons";
+import { getTypeIcon, getAccountIcon } from "@/lib/icons";
 import { AccountForm } from "@/components/account-form";
 import { DeleteAccountButton } from "@/components/delete-account-button";
 import { getAppContext } from "@/lib/app-context";
@@ -31,6 +32,12 @@ export default async function AccountDetailPage({
 
   const transactions = await getTransactionsForAccount(supabase, id);
 
+  const { data: linkedGoal } = await supabase
+    .from("goals")
+    .select("id, name")
+    .eq("account_id", account.id)
+    .single();
+
   return (
     <div className="space-y-6">
       <PageBreadcrumbs items={[{ label: "Accounts", href: "/accounts" }, { label: account.name }]} />
@@ -38,15 +45,16 @@ export default async function AccountDetailPage({
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-3">
-            {account.icon && (
-              <img
-                src={account.icon}
-                alt=""
-                className="w-10 h-10 rounded-lg object-contain"
-              />
-            )}
+            <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden">
+              {getAccountIcon(account.icon, account.type, 24)}
+            </div>
             <div>
               <h1 className="text-2xl font-bold">{account.name}</h1>
+              {linkedGoal && (
+                <Link href={`/goals/${linkedGoal.id}`} className="text-sm text-primary hover:underline">
+                  View Goal
+                </Link>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -122,7 +130,7 @@ export default async function AccountDetailPage({
                       (t.type === "income"
                         ? "text-green-600"
                         : t.type === "transfer"
-                          ? "text-blue-600"
+                          ? ""
                           : "text-red-600")
                     }
                   >

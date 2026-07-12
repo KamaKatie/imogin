@@ -4,6 +4,8 @@ import { useState, useRef } from "react"
 import { createAccount, updateAccount, uploadAccountIcon, deleteAccountIcon } from "@/lib/actions/accounts"
 import { useRouter } from "next/navigation"
 import { getAccountIcon } from "@/lib/icons"
+import { ACCOUNT_ICON_OPTIONS } from "@/lib/icons"
+import { IconPicker } from "@/components/icon-picker"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
@@ -38,7 +40,8 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
   const [pending, setPending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
-  const [iconUrl, setIconUrl] = useState(account?.icon || "")
+  const [iconValue, setIconValue] = useState(account?.icon || "")
+  const [iconMode, setIconMode] = useState<"lucide" | "upload">(account?.icon && isStorageUrl(account.icon) ? "upload" : account?.icon ? "lucide" : "lucide")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,11 +55,12 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
       fd.append("file", file)
       const url = await uploadAccountIcon(fd)
 
-      if (isStorageUrl(iconUrl)) {
-        deleteAccountIcon(iconUrl).catch(() => {})
+      if (isStorageUrl(iconValue)) {
+        deleteAccountIcon(iconValue).catch(() => {})
       }
 
-      setIconUrl(url)
+      setIconValue(url)
+      setIconMode("upload")
     } catch (err) {
       setError((err as Error).message)
     }
@@ -64,10 +68,19 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
   }
 
   const handleRemove = () => {
-    if (isStorageUrl(iconUrl)) {
-      deleteAccountIcon(iconUrl).catch(() => {})
+    if (isStorageUrl(iconValue)) {
+      deleteAccountIcon(iconValue).catch(() => {})
     }
-    setIconUrl("")
+    setIconValue("")
+    setIconMode("lucide")
+  }
+
+  const handleLucideIconChange = (key: string) => {
+    if (isStorageUrl(iconValue)) {
+      deleteAccountIcon(iconValue).catch(() => {})
+    }
+    setIconValue(key)
+    setIconMode("lucide")
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -76,7 +89,7 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
     setError("")
     try {
       const fd = new FormData(e.currentTarget)
-      fd.set("icon", iconUrl)
+      fd.set("icon", iconValue)
 
       if (isEdit) {
         await updateAccount(account.id, fd)
@@ -140,9 +153,9 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Account Icon</label>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg border bg-background flex items-center justify-center shrink-0">
-                {getAccountIcon(iconUrl || null, account?.type || "checking", 22)}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg border bg-background flex items-center justify-center shrink-0 overflow-hidden">
+                {getAccountIcon(iconValue || null, account?.type || "checking", 22)}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -151,9 +164,9 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
                   disabled={uploading}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {uploading ? "Uploading..." : (iconUrl ? "Change" : "Upload logo")}
+                  {uploading ? "Uploading..." : (iconMode === "upload" ? "Change logo" : "Upload logo")}
                 </button>
-                {iconUrl && (
+                {iconMode === "upload" && (
                   <button
                     type="button"
                     onClick={handleRemove}
@@ -171,7 +184,8 @@ export function AccountForm({ hasPartner, account, trigger }: AccountFormProps) 
                 onChange={handleFileUpload}
               />
             </div>
-            <input type="hidden" name="icon" value={iconUrl} />
+            <IconPicker icons={ACCOUNT_ICON_OPTIONS} value={iconMode === "lucide" ? iconValue : ""} onChange={handleLucideIconChange} />
+            <input type="hidden" name="icon" value={iconValue} />
           </div>
 
           {hasPartner && !isEdit && (

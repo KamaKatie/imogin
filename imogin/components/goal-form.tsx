@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ColorSwatch } from "@/components/color-swatch";
+import { IconPicker } from "@/components/icon-picker";
+import { GOAL_ICON_OPTIONS } from "@/lib/icons";
 import { createGoal } from "@/lib/actions/goals";
 import { useRouter } from "next/navigation";
 import {
@@ -23,6 +25,7 @@ export function GoalForm({ hasPartner }: GoalFormProps) {
   const [error, setError] = useState("");
   const [isShared, setIsShared] = useState(false);
   const [selectedColor, setSelectedColor] = useState("#10B981");
+  const [selectedIcon, setSelectedIcon] = useState("target");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,25 +106,14 @@ export function GoalForm({ hasPartner }: GoalFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="icon" className="text-sm font-medium">
-                Icon
-              </label>
-              <select
-                id="icon"
-                name="icon"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              >
-                <option value="🎯">🎯 Target</option>
-                <option value="💰">💰 Money</option>
-                <option value="🏠">🏠 House</option>
-                <option value="✈️">✈️ Travel</option>
-                <option value="🚗">🚗 Car</option>
-              </select>
-            </div>
-            <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
               <ColorSwatch value={selectedColor} onChange={setSelectedColor} />
               <input type="hidden" name="color" value={selectedColor} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Icon</label>
+              <IconPicker icons={GOAL_ICON_OPTIONS} value={selectedIcon} onChange={setSelectedIcon} />
+              <input type="hidden" name="icon" value={selectedIcon} />
             </div>
           </div>
           {hasPartner && (

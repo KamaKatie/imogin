@@ -13,7 +13,7 @@ export async function getPartnershipGoals(
 ) {
   let query = supabase
     .from("goals")
-    .select("*")
+    .select("*, accounts!goals_account_id_fkey(balance)")
     .or(
       partnershipId
         ? `user_id.eq.${userId},partnership_id.eq.${partnershipId}`
@@ -24,7 +24,10 @@ export async function getPartnershipGoals(
   }
   query = query.order("created_at", { ascending: false })
   const { data } = await query
-  return data || []
+  return (data || []).map(g => ({
+    ...g,
+    current_amount: g.accounts?.balance ?? g.current_amount ?? 0,
+  }))
 }
 
 export async function getGoalById(
@@ -33,7 +36,7 @@ export async function getGoalById(
 ) {
   const { data, error } = await supabase
     .from("goals")
-    .select(`*, goal_contributions(*)`)
+    .select("*")
     .eq("id", goalId)
     .single()
   if (error) return null

@@ -3,6 +3,7 @@
 import { useSupabaseFetch } from "@/lib/hooks/use-supabase-query"
 import { createClient } from "@/lib/supabase/client"
 import { useAppContext } from "@/components/app-context-provider"
+import { getAccessibleAccountIds } from "@/lib/queries/accounts"
 import { getMonthlyTransactions } from "@/lib/queries/transactions"
 
 export function useMonthlyTransactions() {
@@ -16,25 +17,7 @@ export function useMonthlyTransactions() {
     `monthly-transactions-${userId}-${firstDay}`,
     async () => {
       const supabase = createClient()
-      // Get all accessible account IDs
-      let accountIds: string[] = []
-      const { data: personal } = await supabase
-        .from("accounts")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("is_shared", false)
-      accountIds.push(...(personal || []).map((a: { id: string }) => a.id))
-
-      if (partnershipId) {
-        const { data: shared } = await supabase
-          .from("accounts")
-          .select("id")
-          .eq("partnership_id", partnershipId)
-          .eq("is_shared", true)
-        accountIds.push(...(shared || []).map((a: { id: string }) => a.id))
-      }
-
-      accountIds = [...new Set(accountIds)]
+      const accountIds = await getAccessibleAccountIds(supabase, userId, partnershipId)
       return getMonthlyTransactions(supabase, accountIds, firstDay, lastDay)
     },
     { dedupingInterval: 30_000 },

@@ -4,18 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { CategoryType } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
-import { getPartnershipCategories } from "@/lib/queries/categories"
-
-export async function getCategories() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-  if (!partnershipId) return []
-
-  return await getPartnershipCategories(supabase, partnershipId) || []
-}
 
 export async function createCategory(formData: FormData) {
   const supabase = await createClient()

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { updateGoal } from "@/lib/actions/goals";
 import { useRouter } from "next/navigation";
 import { ColorSwatch } from "@/components/color-swatch";
+import { IconPicker } from "@/components/icon-picker";
+import { GOAL_ICON_OPTIONS } from "@/lib/icons";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,7 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [selectedColor, setSelectedColor] = useState(goal.color || "#10B981");
+  const [selectedIcon, setSelectedIcon] = useState(goal.icon || "target");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,10 +53,7 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          className="text-xs text-muted-foreground hover:text-foreground"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <button className="text-xs text-muted-foreground hover:text-foreground">
           Edit
         </button>
       </DialogTrigger>
@@ -113,27 +113,14 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label htmlFor="icon" className="text-sm font-medium">
-                Icon
-              </label>
-              <select
-                id="icon"
-                name="icon"
-                defaultValue={goal.icon || ""}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Default</option>
-                <option value="??">?? Target</option>
-                <option value="??">?? Money</option>
-                <option value="??">?? House</option>
-                <option value="??">?? Travel</option>
-                <option value="??">?? Car</option>
-              </select>
-            </div>
-            <div className="space-y-2">
               <label className="text-sm font-medium">Color</label>
               <ColorSwatch value={selectedColor} onChange={setSelectedColor} />
               <input type="hidden" name="color" value={selectedColor} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Icon</label>
+              <IconPicker icons={GOAL_ICON_OPTIONS} value={selectedIcon} onChange={setSelectedIcon} />
+              <input type="hidden" name="icon" value={selectedIcon} />
             </div>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}

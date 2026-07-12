@@ -3,8 +3,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { TransactionType } from "@/lib/supabase/types-extension"
-import { getPartnershipId } from "@/lib/queries"
-import { getTransactionById } from "@/lib/queries/transactions"
 
 async function adjustBalance(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -22,54 +20,6 @@ async function adjustBalance(
     .update({ balance: (account.balance || 0) + delta })
     .eq("id", accountId)
   if (error) throw new Error(error.message)
-}
-
-export async function getTransactions(accountId?: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-
-  let query
-
-  if (partnershipId) {
-    query = supabase
-      .from("transactions")
-      .select(`
-        *,
-        accounts!account_id(*),
-        categories(*),
-        transaction_splits(*)
-      `)
-      .or(
-          `user_id.eq.${user.id},and(account_id.in.(
-          select id from accounts where partnership_id.eq.${partnershipId}
-        ))`
-      )
-  } else {
-    query = supabase
-      .from("transactions")
-      .select(`
-        *,
-        accounts!account_id(*),
-        categories(*),
-        transaction_splits(*)
-      `)
-      .eq("user_id", user.id)
-  }
-
-  if (accountId) {
-    query = query.eq("account_id", accountId)
-  }
-
-  const { data } = await query.order("date", { ascending: false }).limit(100)
-  return data || []
-}
-
-export async function getTransaction(id: string) {
-  const supabase = await createClient()
-  return await getTransactionById(supabase, id)
 }
 
 export async function createTransaction(formData: FormData) {
@@ -290,6 +240,29 @@ export async function deleteTransaction(id: string) {
     .eq("id", id)
 
   if (error) throw new Error(error.message)
+
+  // Sync goal current_amount if this was a transfer to a goal account
+  if (tx.type === "transfer" && tx.to_account_id) {
+    const { data: goal } = await supabase
+      .from("goals")
+      .select("id")
+      .eq("account_id", tx.to_account_id)
+      .single()
+    if (goal) {
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("balance")
+        .eq("id", tx.to_account_id)
+        .single()
+      if (account) {
+        await supabase
+          .from("goals")
+          .update({ current_amount: account.balance || 0 })
+          .eq("id", goal.id)
+      }
+    }
+  }
+
   return { success: true }
 }
 

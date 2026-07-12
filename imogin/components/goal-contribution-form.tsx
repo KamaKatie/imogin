@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { addGoalContribution } from "@/lib/actions/goals";
 
 interface Account {
@@ -15,14 +16,25 @@ interface GoalContributionFormProps {
 }
 
 export function GoalContributionForm({ goalId, accounts }: GoalContributionFormProps) {
-  const [, formAction, pending] = useActionState(
-    (_prev: unknown, formData: FormData) =>
-      addGoalContribution(goalId, formData),
-    undefined,
-  );
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setPending(true);
+    try {
+      const fd = new FormData(e.currentTarget);
+      await addGoalContribution(goalId, fd);
+      (e.target as HTMLFormElement).reset();
+      router.refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+    setPending(false);
+  };
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex gap-3">
         <div className="flex-1 space-y-2">
           <label htmlFor="amount" className="text-sm font-medium">

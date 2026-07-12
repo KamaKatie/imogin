@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getAccountIcon } from "@/lib/icons";
 import { useTheme } from "next-themes";
 import { useState } from "react";
 import { usePrefetch } from "@/lib/hooks/use-prefetch";
@@ -47,6 +48,7 @@ interface AccountItem {
 interface SidebarProps {
   profile: SidebarProfile;
   accounts: AccountItem[];
+  goalMap: Map<string, { name: string; icon: string | null }>;
 }
 
 const planningItems = [
@@ -236,7 +238,7 @@ const bottomIconMap: Record<string, React.ReactNode> = {
   ),
 };
 
-export function Sidebar({ profile, accounts }: SidebarProps) {
+export function Sidebar({ profile, accounts, goalMap }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -314,38 +316,57 @@ export function Sidebar({ profile, accounts }: SidebarProps) {
             {iconMap["Wallet"] || null}
             Accounts
           </Link>
-          <div className="rounded-lg bg-muted/40 p-2 space-y-0.5">
+          <div className="rounded-lg bg-muted/40 p-2 space-y-2">
             {accounts.length === 0 ? (
               <p className="px-2 py-1 text-xs text-muted-foreground">
                 No accounts yet
               </p>
             ) : (
-              accounts.map((a) => (
-                <Link
-                  key={a.id}
-                  href={"/accounts/" + a.id}
-                  className={cn(
-                    "flex items-center justify-between px-2 py-1.5 rounded text-sm font-medium transition-colors",
-                    pathname === "/accounts/" + a.id
-                      ? "bg-accent text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  )}
-                >
-                  <span className="flex items-center gap-2 truncate">
-                    {a.icon && (
-                      <img
-                        src={a.icon}
-                        alt=""
-                        className="w-4 h-4 rounded object-contain shrink-0"
-                      />
-                    )}
-                    <span className="truncate">{a.name}</span>
-                  </span>
-                  <span className="shrink-0 ml-2">
-                    ¥{Math.abs(a.balance).toLocaleString()}
-                  </span>
-                </Link>
-              ))
+              (() => {
+                const typeOrder = ["checking", "savings", "credit", "cash", "other"];
+                const grouped = accounts.reduce<Record<string, typeof accounts>>((acc, a) => {
+                  const key = a.type || "other";
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(a);
+                  return acc;
+                }, {});
+                const sortedTypes = Object.keys(grouped).sort(
+                  (a, b) => typeOrder.indexOf(a) - typeOrder.indexOf(b)
+                );
+                return sortedTypes.map((type) => (
+                  <div key={type}>
+                    <div className="px-2 py-1">
+                      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{type.replace("_", " ")}</span>
+                    </div>
+                    {grouped[type].map((a) => {
+                      const goal = goalMap.get(a.id);
+                      const displayName = goal?.name || a.name;
+                      return (
+                        <Link
+                          key={a.id}
+                          href={"/accounts/" + a.id}
+                          className={cn(
+                            "flex items-center justify-between px-2 py-1.5 rounded text-sm font-medium transition-colors",
+                            pathname === "/accounts/" + a.id
+                              ? "bg-accent text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                          )}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span className="w-4 h-4 flex items-center justify-center shrink-0 overflow-hidden">
+                              {getAccountIcon(a.icon, a.type, 16)}
+                            </span>
+                            <span className="truncate">{displayName}</span>
+                          </span>
+                          <span className="shrink-0 ml-2">
+                            ¥{Math.abs(a.balance).toLocaleString()}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ));
+              })()
             )}
           </div>
 

@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BillingCycle, SplitMethod } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
-import { getActiveBills, getBillById } from "@/lib/queries/bills"
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
@@ -58,71 +57,6 @@ function calculateNextBillingDate(dueDay: number, billingCycle: BillingCycle): s
       return candidate.toISOString().split("T")[0]
     }
   }
-}
-
-export async function getBills() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-  if (!partnershipId) return []
-
-  return await getActiveBills(supabase, partnershipId)
-}
-
-export async function getBill(id: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  return await getBillById(supabase, id)
-}
-
-export async function getBillWithDetails(id: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const bill = await getBillById(supabase, id)
-
-  if (!bill) return null
-
-  const partnershipId = bill.partnership_id
-
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select(`
-      *,
-      profiles!inner(name)
-    `)
-    .eq("bill_id", id)
-    .order("date", { ascending: false })
-
-  const { data: memberRows } = await supabase
-    .from("partnership_members")
-    .select("user_id")
-    .eq("partnership_id", partnershipId)
-
-  let partnerProfile: { name: string | null } | null = null
-  const otherUserId = memberRows?.find((m) => m.user_id !== user.id)?.user_id
-  if (otherUserId) {
-    const { data: pp } = await supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", otherUserId)
-      .single()
-    partnerProfile = pp
-  }
-
-  const partnership = await supabase
-    .from("partnerships")
-    .select("id")
-    .eq("id", partnershipId)
-    .single()
-    .then((r) => r.data)
-
-  return { bill, transactions: transactions || [], partnership, partnerProfile }
 }
 
 export async function createBill(formData: FormData) {

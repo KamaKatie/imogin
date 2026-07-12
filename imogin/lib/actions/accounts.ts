@@ -4,29 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { AccountType } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
-import { getPersonalAccounts, getSharedAccounts, getAccountById } from "@/lib/queries/accounts"
-
-export async function getAccounts() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-
-  if (partnershipId) {
-    const shared = await getSharedAccounts(supabase, partnershipId)
-    const personal = await getPersonalAccounts(supabase, user.id)
-
-    return [...(personal || []), ...(shared || [])]
-  }
-
-  return await getPersonalAccounts(supabase, user.id)
-}
-
-export async function getAccount(id: string) {
-  const supabase = await createClient()
-  return await getAccountById(supabase, id)
-}
 
 const STORAGE_BASE = "https://jjojwvdtwtodapqszizc.supabase.co/storage/v1/object/public/account_icons/"
 
@@ -116,6 +93,27 @@ export async function updateAccount(id: string, formData: FormData) {
 
 export async function deleteAccount(id: string) {
   const supabase = await createClient()
+
+  const { data: goal } = await supabase
+    .from("goals")
+    .select("id")
+    .eq("account_id", id)
+    .maybeSingle()
+
+  if (goal) {
+    const { data: account } = await supabase
+      .from("accounts")
+      .select("balance")
+      .eq("id", id)
+      .single()
+
+    if (account && account.balance !== 0) {
+      throw new Error("Cannot delete a goal account with a balance. Withdraw funds first.")
+    }
+
+    await supabase.from("goals").delete().eq("id", goal.id)
+  }
+
   const { error } = await supabase
     .from("accounts")
     .delete()

@@ -15,15 +15,30 @@ export default async function DashboardLayout({
   const ctx = await getAppContext(supabase)
   if (!ctx) redirect("/auth/login")
 
-  const { data: accounts } = await supabase
-    .from("accounts")
-    .select("id, name, balance, icon, type")
-    .or(
-      ctx.partnershipId
-        ? `user_id.eq.${ctx.userId},and(is_shared.eq.true,partnership_id.eq.${ctx.partnershipId})`
-        : `user_id.eq.${ctx.userId}`,
-    )
-    .order("name")
+  const [{ data: accounts }, { data: goals }] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, name, balance, icon, type")
+      .or(
+        ctx.partnershipId
+          ? `user_id.eq.${ctx.userId},and(is_shared.eq.true,partnership_id.eq.${ctx.partnershipId})`
+          : `user_id.eq.${ctx.userId}`,
+      )
+      .order("name"),
+    supabase
+      .from("goals")
+      .select("id, name, icon, account_id")
+      .or(
+        ctx.partnershipId
+          ? `user_id.eq.${ctx.userId},partnership_id.eq.${ctx.partnershipId}`
+          : `user_id.eq.${ctx.userId}`,
+      ),
+  ])
+
+  const goalMap = new Map<string, { name: string; icon: string | null }>()
+  for (const g of goals || []) {
+    if (g.account_id) goalMap.set(g.account_id, { name: g.name, icon: g.icon })
+  }
 
   const sidebarProfile = {
     name: ctx.profile?.name || ctx.profile?.email || ctx.email || "",
@@ -33,7 +48,7 @@ export default async function DashboardLayout({
   return (
     <AppContextProvider data={ctx}>
       <div className="flex h-screen">
-        <Sidebar profile={sidebarProfile} accounts={accounts || []} />
+        <Sidebar profile={sidebarProfile} accounts={accounts || []} goalMap={goalMap} />
         <div className="flex flex-col flex-1 lg:ml-64">
           <TopBar />
           <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-20 lg:pb-6">

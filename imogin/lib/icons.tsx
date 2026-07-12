@@ -151,6 +151,40 @@ export const ACCOUNT_TYPE_DEFAULT_ICONS: Record<string, string> = {
   other: "coins",
 };
 
+export const GOAL_ICON_OPTIONS = [
+  { key: "target", label: "Target" },
+  { key: "coins", label: "Money" },
+  { key: "home", label: "House" },
+  { key: "plane", label: "Travel" },
+  { key: "car", label: "Car" },
+  { key: "piggy-bank", label: "Savings" },
+  { key: "gift", label: "Gift" },
+  { key: "heart", label: "Health" },
+  { key: "graduation-cap", label: "Education" },
+  { key: "dumbbell", label: "Fitness" },
+  { key: "briefcase", label: "Career" },
+  { key: "coffee", label: "Lifestyle" },
+] as const;
+
+export const ACCOUNT_ICON_OPTIONS = [
+  { key: "landmark", label: "Bank" },
+  { key: "credit-card", label: "Credit" },
+  { key: "wallet", label: "Wallet" },
+  { key: "banknote", label: "Cash" },
+  { key: "trending-up", label: "Invest" },
+  { key: "coins", label: "Coins" },
+  { key: "piggy-bank", label: "Savings" },
+  { key: "shopping-cart", label: "Shopping" },
+  { key: "home", label: "Home" },
+  { key: "car", label: "Car" },
+  { key: "plane", label: "Travel" },
+  { key: "heart", label: "Health" },
+  { key: "graduation-cap", label: "Education" },
+  { key: "dumbbell", label: "Fitness" },
+  { key: "briefcase", label: "Career" },
+  { key: "coffee", label: "Lifestyle" },
+] as const;
+
 function isIconUrl(value: string): boolean {
   return (
     value.startsWith("http://") ||

@@ -142,7 +142,7 @@ export function TransactionsTable({
                 <span className="ml-1.5 text-[11px] text-orange-500 font-medium">(split)</span>
               )}
               {t.type === "transfer" && (
-                <span className="ml-1.5 text-[11px] text-blue-500 font-medium">(transfer)</span>
+                <span className="ml-1.5 text-[11px] text-muted-foreground font-medium">(transfer)</span>
               )}
             </div>
           )
@@ -200,7 +200,7 @@ export function TransactionsTable({
             t.type === "income"
               ? "text-green-600"
               : t.type === "transfer"
-                ? "text-blue-600"
+                ? ""
                 : "text-red-600"
           return (
             <span className={`font-medium tabular-nums ${color}`}>
@@ -301,7 +301,7 @@ export function TransactionsTable({
                 t.type === "income"
                   ? "text-green-600"
                   : t.type === "transfer"
-                    ? "text-blue-600"
+                    ? ""
                     : "text-red-600"
               const cat = t.categories
               return (

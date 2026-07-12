@@ -11,7 +11,6 @@ export function useRecentTransactions() {
     `recent-transactions-${userId}`,
     async () => {
       const supabase = createClient()
-      // Get shared account IDs for the query
       let sharedIds: string[] = []
       if (partnershipId) {
         const { data: shared } = await supabase

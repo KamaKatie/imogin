@@ -4,48 +4,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { BudgetPeriod } from "@/lib/supabase/types-extension"
 import { getPartnershipId } from "@/lib/queries"
-import { getBudgetsWithCategories, getBudgetSpending } from "@/lib/queries/budgets"
-
-export async function getBudgets() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-
-  return await getBudgetsWithCategories(supabase, user.id, partnershipId)
-}
-
-export async function getBudgetWithSpending() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect("/auth/login")
-
-  const partnershipId = await getPartnershipId(supabase, user.id)
-
-  const budgets = await getBudgetsWithCategories(supabase, user.id, partnershipId)
-
-  if (!budgets || budgets.length === 0) return []
-
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
-
-  const categoryIds = budgets.map(b => b.category_id).filter(Boolean)
-  const txns = await getBudgetSpending(supabase, categoryIds, firstOfMonth, lastOfMonth)
-
-  const budgetsWithSpending = budgets.map((budget) => {
-    let spent = 0
-    for (const t of txns || []) {
-      if (t.category_id !== budget.category_id) continue
-      if (budget.user_id && t.user_id !== user.id) continue
-      spent += Math.abs(t.amount)
-    }
-    return { ...budget, spent }
-  })
-
-  return budgetsWithSpending
-}
 
 export async function updateBudget(id: string, formData: FormData) {
   const supabase = await createClient()

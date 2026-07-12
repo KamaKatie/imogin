@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import { GoalForm } from "@/components/goal-form"
-import { GoalEditDialog } from "@/components/goal-edit-dialog"
 import { usePartnershipGoals } from "@/lib/hooks/use-partnership-goals"
 import { useAppContext } from "@/components/app-context-provider"
+import { getCategoryIcon } from "@/lib/icons"
 
 export default function GoalsPage() {
   const { partnershipId } = useAppContext()
@@ -41,7 +41,9 @@ export default function GoalsPage() {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{g.icon || "🎯"}</span>
+                        <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted/50 text-primary shrink-0">
+                          {getCategoryIcon(g.icon, 18) || getCategoryIcon("target", 18)}
+                        </span>
                         <div>
                           <p className="font-medium">{g.name}</p>
                           {g.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{g.description}</p>}
@@ -52,9 +54,8 @@ export default function GoalsPage() {
                         g.status === "active" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" :
                         "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                       }`}>
-                        {g.status}
+                        {g.status.charAt(0).toUpperCase() + g.status.slice(1)}
                       </span>
-                      <GoalEditDialog goal={g} />
                     </div>
 
                     <div className="mb-2">

@@ -86,10 +86,10 @@ export function MonthlyLineChart({ data }: MonthlyLineChartProps) {
                 type="checkbox"
                 checked={visible.has(l.key)}
                 onChange={() => toggle(l.key)}
-                className="size-3 accent-black"
+                style={{ accentColor: l.color }}
+                className="size-3"
               />
               {l.label}
-              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: l.color }} />
             </label>
           ))}
         </div>
