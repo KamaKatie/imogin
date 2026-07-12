@@ -5,10 +5,22 @@ import { PageBreadcrumbs } from "@/lib/page-info";
 import { getTypeIcon, getAccountIcon } from "@/lib/icons";
 import { AccountForm } from "@/components/account-form";
 import { DeleteAccountButton } from "@/components/delete-account-button";
+import { LazyMonthlyLineChart } from "@/components/lazy-monthly-chart";
+import { SimpleTransactionList } from "@/components/simple-transaction-list";
 import { getAppContext } from "@/lib/app-context";
 import { getAccountById } from "@/lib/queries/accounts";
 import { getTransactionsForAccount } from "@/lib/queries/transactions";
 import type { Account } from "@/lib/supabase/types-extension";
+
+function getMonthRange() {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const start = new Date(now.getFullYear(), now.getMonth() - 23, 1);
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  };
+}
 
 export default async function AccountDetailPage({
   params,
@@ -37,6 +49,46 @@ export default async function AccountDetailPage({
     .select("id, name")
     .eq("account_id", account.id)
     .single();
+
+  const { start, end } = getMonthRange();
+  const { data: monthlyTxns } = await supabase
+    .from("transactions")
+    .select("amount, type, date")
+    .eq("account_id", id)
+    .gte("date", start)
+    .lte("date", end)
+    .order("date", { ascending: true });
+
+  let totalSpent = 0;
+  let totalIncome = 0;
+  const monthMap = new Map<string, { totalIncome: number; totalSpent: number }>();
+
+  if (monthlyTxns) {
+    for (const t of monthlyTxns) {
+      const key = t.date.slice(0, 7);
+      const entry = monthMap.get(key) || { totalIncome: 0, totalSpent: 0 };
+      if (t.type === "income") {
+        entry.totalIncome += Math.abs(t.amount);
+        totalIncome += Math.abs(t.amount);
+      } else if (t.type === "expense") {
+        entry.totalSpent += Math.abs(t.amount);
+        totalSpent += Math.abs(t.amount);
+      }
+      monthMap.set(key, entry);
+    }
+  }
+
+  const now = new Date();
+  const monthlyTrend: Array<{ label: string; totalIncome: number; totalSpent: number }> = [];
+  for (let i = 23; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleString("default", { month: "short", year: "2-digit" });
+    const data = monthMap.get(key) || { totalIncome: 0, totalSpent: 0 };
+    monthlyTrend.push({ label, ...data });
+  }
+
+  const net = totalIncome - totalSpent;
 
   return (
     <div className="space-y-6">
@@ -89,69 +141,54 @@ export default async function AccountDetailPage({
         )}
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Transactions</h2>
-        {!transactions || transactions.length === 0 ? (
-          <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
-            <p>No transactions for this account</p>
+      {!linkedGoal && (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Spent</p>
+              <p className="text-xl font-bold mt-1 text-red-600">¥{totalSpent.toLocaleString()}</p>
+            </div>
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Income</p>
+              <p className="text-xl font-bold mt-1 text-green-600">¥{totalIncome.toLocaleString()}</p>
+            </div>
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Net</p>
+              <p className={`text-xl font-bold mt-1 ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
+                ¥{net.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Balance</p>
+              <p className="text-xl font-bold mt-1">¥{Math.abs(account.balance).toLocaleString()}</p>
+            </div>
           </div>
-        ) : (
-          <div className="rounded-xl border bg-card divide-y">
-            {transactions.map((t: Record<string, unknown>) => (
-              <div
-                key={t.id as string}
-                className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={
-                      "w-2 h-2 rounded-full " +
-                      (t.type === "income"
-                        ? "bg-green-500"
-                        : t.type === "transfer"
-                          ? "bg-blue-500"
-                          : "bg-red-500")
-                    }
-                  />
-                  <div>
-                    <p className="text-sm font-medium">
-                      {(t.description as string) ||
-                        (t.type === "transfer" ? "Transfer" : "No description")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t.date as string}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p
-                    className={
-                      "text-sm font-medium " +
-                      (t.type === "income"
-                        ? "text-green-600"
-                        : t.type === "transfer"
-                          ? ""
-                          : "text-red-600")
-                    }
-                  >
-                    {t.type === "income"
-                      ? "+"
-                      : t.type === "transfer"
-                        ? "\u2194"
-                        : "-"}
-                    &yen;{Math.abs(t.amount as number).toLocaleString()}
-                  </p>
-                  {(t.categories as { name: string } | null)?.name && (
-                    <p className="text-xs text-muted-foreground">
-                      {(t.categories as { name: string }).name}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+
+          <div className="grid gap-4 lg:grid-cols-5">
+            <div className="rounded-xl border bg-card p-4 md:p-5 lg:col-span-3">
+              <h2 className="font-semibold mb-3 text-sm">Monthly Overview</h2>
+              <LazyMonthlyLineChart data={monthlyTrend} />
+            </div>
+            <div className="rounded-xl border bg-card p-4 lg:col-span-2">
+              <h2 className="font-semibold mb-3 text-sm">Transactions</h2>
+              {!transactions || transactions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No transactions for this account</p>
+              ) : (
+                <SimpleTransactionList
+                  transactions={(transactions as unknown as Array<Record<string, unknown>>).map((t) => ({
+                    id: t.id as string,
+                    amount: t.amount as number,
+                    date: t.date as string,
+                    type: t.type as string,
+                    description: t.description as string | null,
+                    subtitle: t.date as string,
+                  }))}
+                />
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ export interface AppContext {
   partnershipId: string | null
   partnerUserId: string | null
   profile: { name: string | null; email: string; avatar_url: string | null } | null
+  preferences: Record<string, unknown>
 }
 
 export async function getAppContext(
@@ -22,7 +23,7 @@ export async function getAppContext(
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("name, email, avatar_url")
+      .select("name, email, avatar_url, preferences")
       .eq("id", user.id)
       .single(),
   ])
@@ -44,5 +45,6 @@ export async function getAppContext(
     partnershipId,
     partnerUserId,
     profile: profileResult.data,
+    preferences: (profileResult.data?.preferences as Record<string, unknown>) || {},
   }
 }

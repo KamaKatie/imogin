@@ -7,7 +7,7 @@ import { getAccessibleAccounts } from "@/lib/queries/accounts"
 
 export function useAccessibleAccounts() {
   const { userId, partnershipId } = useAppContext()
-  const { data, error, isLoading } = useSupabaseFetch(
+  const { data, error, isLoading, mutate } = useSupabaseFetch(
     `accessible-accounts-${userId}-${partnershipId || "none"}`,
     async () => {
       const supabase = createClient()
@@ -15,5 +15,5 @@ export function useAccessibleAccounts() {
     },
     { dedupingInterval: 60_000 },
   )
-  return { accounts: data || [], error, isLoading }
+  return { accounts: data || [], error, isLoading, mutate }
 }

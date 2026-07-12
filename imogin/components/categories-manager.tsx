@@ -215,7 +215,6 @@ export function CategoriesManager({ categories, spendingByCategory = [] }: Categ
 
           <div className="flex flex-col gap-1 sm:grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 sm:gap-2">
             {filteredCategories.map((c) => {
-              const spent = spendingByCategory.find(s => s.name === c.name)
               return (
                 <Link
                   key={c.id}
@@ -232,11 +231,6 @@ export function CategoriesManager({ categories, spendingByCategory = [] }: Categ
                   </div>
                   <div className="flex-1 sm:flex-none sm:w-full flex items-center justify-between sm:flex-col sm:items-center">
                     <span className="text-sm font-medium truncate sm:w-full">{c.name}</span>
-                    {c.type === "expense" && (
-                      <span className="text-sm text-muted-foreground tabular-nums font-medium sm:text-xs">
-                        {spent ? `¥${spent.total.toLocaleString()}` : "¥0"}
-                      </span>
-                    )}
                   </div>
                 </Link>
               )

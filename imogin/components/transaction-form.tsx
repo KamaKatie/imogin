@@ -37,10 +37,11 @@ interface TransactionFormProps {
   categories: CategoryOption[]
   partnershipId: string | null
   partnerUserId: string | null
-  // userId is not used in the component body
   userProfile: ProfileInfo | null
   partnerProfile: ProfileInfo | null
   trigger?: React.ReactNode
+  onSuccess?: () => void
+  onCategoriesChange?: () => void
 }
 
 function getAvatarUrl(profile: ProfileInfo | null): string | null {
@@ -63,7 +64,7 @@ function AvatarCircle({ url, name, email, size = 32 }: { url?: string | null; na
   )
 }
 
-export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userProfile, partnerProfile, trigger }: TransactionFormProps) {
+export function TransactionForm({ accounts, categories, partnershipId, partnerUserId, userProfile, partnerProfile, trigger, onSuccess, onCategoriesChange }: TransactionFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -94,6 +95,7 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
       await createTransaction(fd)
       setOpen(false)
       router.refresh()
+      onSuccess?.()
     } catch (err) {
       setError((err as Error).message)
     }
@@ -111,7 +113,7 @@ export function TransactionForm({ accounts, categories, partnershipId, partnerUs
   }
 
   return (
-    <BottomSheet open={open} onOpenChange={setOpen}>
+    <BottomSheet open={open} onOpenChange={(o) => { setOpen(o); if (o) onCategoriesChange?.() }}>
       <BottomSheetTrigger asChild>
         {trigger || (
           <button className="inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90">

@@ -154,16 +154,8 @@ export const ACCOUNT_TYPE_DEFAULT_ICONS: Record<string, string> = {
 export const GOAL_ICON_OPTIONS = [
   { key: "target", label: "Target" },
   { key: "coins", label: "Money" },
-  { key: "home", label: "House" },
   { key: "plane", label: "Travel" },
-  { key: "car", label: "Car" },
   { key: "piggy-bank", label: "Savings" },
-  { key: "gift", label: "Gift" },
-  { key: "heart", label: "Health" },
-  { key: "graduation-cap", label: "Education" },
-  { key: "dumbbell", label: "Fitness" },
-  { key: "briefcase", label: "Career" },
-  { key: "coffee", label: "Lifestyle" },
 ] as const;
 
 export const ACCOUNT_ICON_OPTIONS = [

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { PageBreadcrumbs } from "@/lib/page-info"
 import { GoalContributionForm } from "@/components/goal-contribution-form"
 import { GoalEditDialog } from "@/components/goal-edit-dialog"
+import { SimpleTransactionList } from "@/components/simple-transaction-list"
 import { getAppContext } from "@/lib/app-context"
 import { getGoalById } from "@/lib/queries/goals"
 import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
@@ -143,25 +144,21 @@ export default async function GoalDetailPage({
         {transfers.length === 0 ? (
           <p className="text-sm text-muted-foreground">No contributions yet</p>
         ) : (
-          <div className="space-y-3">
-            {transfers.map((t) => {
+          <SimpleTransactionList
+            transactions={transfers.map((t) => {
               const profile = profileMap.get(t.user_id)
-              return (
-                <Link key={t.id} href={`/transactions/${t.id}`} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/50 rounded px-2 -mx-2 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {profile?.name || profile?.email || "Unknown"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(t.created_at).toLocaleDateString()}
-                      {t.description && ` - ${t.description}`}
-                    </p>
-                  </div>
-                  <p className="text-sm font-medium">+¥{t.amount.toLocaleString()}</p>
-                </Link>
-              )
+              return {
+                id: t.id,
+                amount: t.amount,
+                date: new Date(t.created_at).toLocaleDateString(),
+                type: "income" as const,
+                description: profile?.name || profile?.email || "Unknown",
+                href: `/transactions/${t.id}`,
+                subtitle: `${new Date(t.created_at).toLocaleDateString()}${t.description ? ` · ${t.description}` : ""}`,
+                showSign: false,
+              }
             })}
-          </div>
+          />
         )}
       </div>
     </div>

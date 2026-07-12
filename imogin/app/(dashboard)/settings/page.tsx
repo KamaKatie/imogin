@@ -9,7 +9,7 @@ export default async function SettingsPage() {
   if (!ctx) redirect("/auth/login")
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 max-w-lg">
       <ProfileForm profile={ctx.profile as never} />
     </div>
   )

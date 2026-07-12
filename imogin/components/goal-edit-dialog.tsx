@@ -87,7 +87,7 @@ export function GoalEditDialog({ goal }: GoalEditDialogProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="target_amount" className="text-sm font-medium">
-                Target (\)
+                Target (¥)
               </label>
               <input
                 id="target_amount"

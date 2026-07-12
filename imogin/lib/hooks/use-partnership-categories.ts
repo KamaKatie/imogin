@@ -7,7 +7,7 @@ import { getPartnershipCategories } from "@/lib/queries/categories"
 
 export function usePartnershipCategories() {
   const { partnershipId } = useAppContext()
-  const { data, error, isLoading } = useSupabaseFetch(
+  const { data, error, isLoading, mutate } = useSupabaseFetch(
     `categories-${partnershipId || "none"}`,
     partnershipId
       ? async () => {
@@ -17,5 +17,5 @@ export function usePartnershipCategories() {
       : null,
     { dedupingInterval: 60_000 },
   )
-  return { categories: data || [], error, isLoading }
+  return { categories: data || [], error, isLoading, mutate }
 }

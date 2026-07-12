@@ -10,6 +10,7 @@ import { usePartnershipCategories } from "@/lib/hooks/use-partnership-categories
 import { usePartnerProfile } from "@/lib/hooks/use-partner-profile"
 import { TransactionForm } from "@/components/transaction-form"
 import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table"
+import { TransactionCardList } from "@/components/transaction-card-list"
 import { MobileFab } from "@/components/mobile-fab"
 
 function pickFirst<T>(val: T | T[]): T {
@@ -17,7 +18,7 @@ function pickFirst<T>(val: T | T[]): T {
 }
 
 export default function TransactionsPage() {
-  const { userId, partnershipId, partnerUserId, profile: userProfile } = useAppContext()
+  const { userId, partnershipId, partnerUserId, profile: userProfile, preferences } = useAppContext()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -31,7 +32,7 @@ export default function TransactionsPage() {
   const payerFilter = searchParams.get("payer") || ""
 
   const { accounts: allAccounts, isLoading: accountsLoading } = useAccessibleAccounts()
-  const { categories, isLoading: categoriesLoading } = usePartnershipCategories()
+  const { categories, isLoading: categoriesLoading, mutate: categoriesMutate } = usePartnershipCategories()
   const { profile: partnerProfile, isLoading: profileLoading } = usePartnerProfile()
 
   const accessibleAccountIds = useMemo(() => allAccounts.map((a) => a.id), [allAccounts])
@@ -46,7 +47,7 @@ export default function TransactionsPage() {
     ? `transactions-${JSON.stringify({ page, pageSize, q, sort: sanitizedSort, order: dir, accountFilter, categoryFilter, payerFilter })}`
     : null
 
-  const { data: txData, isLoading: txLoading } = useSWR(
+  const { data: txData, isLoading: txLoading, mutate: txMutate } = useSWR(
     txKey,
     async () => {
       const supabase = createClient()
@@ -138,6 +139,8 @@ export default function TransactionsPage() {
     )
   }
 
+  const transactionView = (preferences.transactionView as string) || "table"
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -149,21 +152,27 @@ export default function TransactionsPage() {
           partnerUserId={partnerUserId}
           userProfile={userProfile}
           partnerProfile={partnerProfile ?? null}
+          onSuccess={() => txMutate()}
+          onCategoriesChange={() => categoriesMutate()}
         />
       </div>
 
-      <TransactionsTable
-        data={txData?.rows || []}
-        totalCount={txData?.totalCount || 0}
-        page={page}
-        pageSize={pageSize}
-        search={q}
-        sort={sanitizedSort}
-        sortDir={dir}
-        accounts={filterAccounts}
-        categories={filterCategories}
-        payers={filterPayers}
-      />
+      {transactionView === "cards" ? (
+        <TransactionCardList data={txData?.rows || []} />
+      ) : (
+        <TransactionsTable
+          data={txData?.rows || []}
+          totalCount={txData?.totalCount || 0}
+          page={page}
+          pageSize={pageSize}
+          search={q}
+          sort={sanitizedSort}
+          sortDir={dir}
+          accounts={filterAccounts}
+          categories={filterCategories}
+          payers={filterPayers}
+        />
+      )}
 
       <MobileFab
         accounts={allAccounts}
@@ -172,6 +181,8 @@ export default function TransactionsPage() {
         partnerUserId={partnerUserId}
         userProfile={userProfile}
         partnerProfile={partnerProfile ?? null}
+        onSuccess={() => txMutate()}
+        onCategoriesChange={() => categoriesMutate()}
       />
     </div>
   )

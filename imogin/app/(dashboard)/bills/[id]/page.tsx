@@ -5,6 +5,7 @@ import { getOrdinal } from "@/lib/dates"
 import { getAppContext } from "@/lib/app-context"
 import { getBillById } from "@/lib/queries/bills"
 import { getPartnerProfile } from "@/lib/queries/profiles"
+import { SimpleTransactionList } from "@/components/simple-transaction-list"
 
 export default async function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -128,17 +129,16 @@ export default async function BillDetailPage({ params }: { params: Promise<{ id:
         {!transactions || transactions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No transactions linked to this bill yet</p>
         ) : (
-          <div className="space-y-2">
-            {(transactions as Array<{ id: string; amount: number; date: string; description: string | null; profiles: { name: string | null }; accounts: { name: string; is_shared: boolean } }>).map((t) => (
-              <div key={t.id} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                <div>
-                  <p className="text-sm font-medium">{t.description || t.accounts?.name || "Transaction"}</p>
-                  <p className="text-xs text-muted-foreground">{t.date} &middot; {t.profiles?.name || "Unknown"}</p>
-                </div>
-                <p className="text-sm font-medium">¥{Math.abs(t.amount).toLocaleString()}</p>
-              </div>
-            ))}
-          </div>
+          <SimpleTransactionList
+            transactions={(transactions as unknown as Array<Record<string, unknown>>).map((t) => ({
+              id: t.id as string,
+              amount: t.amount as number,
+              date: t.date as string,
+              description: t.description as string | null,
+              showSign: false,
+              subtitle: `${t.date} · ${(t.profiles as { name: string | null } | null)?.name || "Unknown"}`,
+            }))}
+          />
         )}
       </div>
     </div>

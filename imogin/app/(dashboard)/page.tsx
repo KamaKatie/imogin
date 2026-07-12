@@ -12,6 +12,7 @@ import { useActiveBills } from "@/lib/hooks/use-active-bills"
 import { useBudgetsWithSpending } from "@/lib/hooks/use-budgets-with-spending"
 import { useRecentTransactions } from "@/lib/hooks/use-recent-transactions"
 import { useMonthlyTransactions } from "@/lib/hooks/use-monthly-transactions"
+import { BrandLogo } from "@/components/brand-logo"
 import Link from "next/link"
 
 export default function DashboardPage() {
@@ -190,9 +191,17 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {(recentTransactions as Array<{ id: string; amount: number; description: string | null; date: string; type: string }>).map((t) => (
-                <div key={t.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{t.description || "No description"}</p>
+                <div key={t.id} className="flex items-center gap-3 justify-between">
+                  <BrandLogo
+                    description={t.description}
+                    fallback={
+                      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0 text-xs text-muted-foreground">
+                        {(t.description || "—").charAt(0).toUpperCase()}
+                      </div>
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{t.description || "No description"}</p>
                     <p className="text-xs text-muted-foreground" title={t.date}>{formatRelativeDate(t.date)}</p>
                   </div>
                   <p className={`text-sm font-medium ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>

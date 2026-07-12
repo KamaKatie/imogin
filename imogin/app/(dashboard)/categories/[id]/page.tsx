@@ -7,6 +7,7 @@ import { getAccessibleAccountIds } from "@/lib/queries/accounts"
 import { getCategoryById } from "@/lib/queries/categories"
 import { LazyCategoryBarChart } from "@/components/lazy-category-chart"
 import { CategoryEditButton } from "@/components/category-edit-button"
+import { SimpleTransactionList } from "@/components/simple-transaction-list"
 import { getAppContext } from "@/lib/app-context"
 
 export default async function CategoryDetailPage({
@@ -142,44 +143,17 @@ export default async function CategoryDetailPage({
             No transactions in this category yet
           </p>
         ) : (
-          <div className="space-y-2">
-            {(transactions as Array<{
-              id: string;
-              amount: number;
-              date: string;
-              type: string;
-              user_id: string;
-              description: string | null;
-              accounts: { id: string; name: string; is_shared: boolean };
-            }>).map((t) => (
-              <Link
-                key={t.id}
-                href={`/transactions/${t.id}`}
-                className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-accent/50 transition-colors -mx-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
-                    {t.description || "No description"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.date} &middot; {t.accounts?.name || "Unknown account"}
-                  </p>
-                </div>
-                <span
-                  className={`text-sm font-medium shrink-0 ml-3 ${
-                    t.type === "income"
-                      ? "text-green-600"
-                      : t.type === "expense"
-                        ? "text-red-600"
-                        : ""
-                  }`}
-                >
-                  {t.type === "income" ? "+" : t.type === "expense" ? "-" : ""}¥
-                  {Math.abs(t.amount).toLocaleString()}
-                </span>
-              </Link>
-            ))}
-          </div>
+          <SimpleTransactionList
+            transactions={(transactions as unknown as Array<Record<string, unknown>>).map((t) => ({
+              id: t.id as string,
+              amount: t.amount as number,
+              date: t.date as string,
+              type: t.type as string,
+              description: t.description as string | null,
+              href: `/transactions/${t.id}`,
+              subtitle: `${t.date} · ${(t.accounts as { name: string } | null)?.name || "Unknown"}`,
+            }))}
+          />
         )}
       </div>
     </div>

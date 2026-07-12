@@ -47,8 +47,16 @@ export async function getAccessibleAccounts(
     query = query.eq("user_id", userId)
   }
 
-  const { data } = await query
-  return data || []
+  const { data: accounts } = await query
+  if (!accounts) return []
+
+  const { data: goalAccounts } = await supabase
+    .from("goals")
+    .select("account_id")
+    .not("account_id", "is", null)
+
+  const goalAccountIds = new Set((goalAccounts || []).map(g => g.account_id))
+  return accounts.filter(a => !goalAccountIds.has(a.id))
 }
 
 export async function getAccessibleAccountIds(

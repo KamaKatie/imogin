@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageBreadcrumbs } from "@/lib/page-info";
 import { TransactionEditDialog } from "@/components/transaction-edit-dialog";
 import { TransactionDeleteButton } from "@/components/transaction-delete-button";
+import { BrandLogoPicker } from "@/components/brand-logo-picker";
 import { formatRelativeDate } from "@/lib/dates";
 import { getCategoryIcon } from "@/lib/icons";
 import { getAppContext } from "@/lib/app-context";
@@ -103,6 +104,7 @@ export default async function TransactionDetailPage({
       <div className="rounded-xl border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
+            <BrandLogoPicker description={tx.description} size={48} />
             <h1 className="text-xl capitalize">{tx.type}</h1>
           </div>
           <div className="flex items-center gap-2">

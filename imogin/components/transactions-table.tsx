@@ -6,6 +6,7 @@ import Link from "next/link"
 import { DataTable } from "@/components/data-table"
 import { formatRelativeDate } from "@/lib/dates"
 import { getCategoryIcon } from "@/lib/icons"
+import { BrandLogo } from "@/components/brand-logo"
 import type { ColumnDef } from "@tanstack/react-table"
 
 export interface TransactionRow {
@@ -311,14 +312,19 @@ export function TransactionsTable({
                   className="flex items-center justify-between rounded-xl border bg-card p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: (cat?.color || "#6B7280") + "18" }}
-                    >
-                      <span style={{ color: cat?.color || "#6B7280" }}>
-                        {cat?.icon ? getCategoryIcon(cat.icon, 16) : "•"}
-                      </span>
-                    </div>
+                    <BrandLogo
+                      description={t.description}
+                      fallback={
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: (cat?.color || "#6B7280") + "18" }}
+                        >
+                          <span style={{ color: cat?.color || "#6B7280" }}>
+                            {cat?.icon ? getCategoryIcon(cat.icon, 16) : "•"}
+                          </span>
+                        </div>
+                      }
+                    />
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
                         {t.description || (t.type === "transfer" ? "Transfer" : "—")}

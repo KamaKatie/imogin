@@ -33,6 +33,8 @@ interface MobileFabProps {
   partnerUserId: string | null
   userProfile: ProfileInfo | null
   partnerProfile: ProfileInfo | null
+  onSuccess?: () => void
+  onCategoriesChange?: () => void
 }
 
 export function MobileFab({
@@ -42,6 +44,8 @@ export function MobileFab({
   partnerUserId,
   userProfile,
   partnerProfile,
+  onSuccess,
+  onCategoriesChange,
 }: MobileFabProps) {
   return (
     <div className="lg:hidden fixed bottom-20 right-4 z-50">
@@ -52,6 +56,8 @@ export function MobileFab({
         partnerUserId={partnerUserId}
         userProfile={userProfile}
         partnerProfile={partnerProfile}
+        onSuccess={onSuccess}
+        onCategoriesChange={onCategoriesChange}
         trigger={
           <button className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 flex items-center justify-center transition-colors">
             <Plus size={24} />

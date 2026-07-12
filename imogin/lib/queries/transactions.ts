@@ -25,7 +25,7 @@ export async function getTransactionsForAccount(
 ) {
   const { data } = await supabase
     .from("transactions")
-    .select("*, categories(name, color)")
+    .select("*, categories(name, color, icon), accounts!account_id(id, name, is_shared)")
     .eq("account_id", accountId)
     .order("date", { ascending: false })
     .limit(50)
