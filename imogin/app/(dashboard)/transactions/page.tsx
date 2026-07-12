@@ -1,126 +1,141 @@
-﻿import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { TransactionForm } from "@/components/transaction-form";
-import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table";
-import { MobileFab } from "@/components/mobile-fab";
-import { getAppContext } from "@/lib/app-context";
-import { getAccessibleAccounts } from "@/lib/queries/accounts";
-import { getPartnershipCategories } from "@/lib/queries/categories";
-import { getPartnerProfile, getProfilesByIds } from "@/lib/queries/profiles";
+﻿"use client"
 
-export default async function TransactionsPage({
-  searchParams: searchParamsPromise,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const supabase = await createClient();
-  const [ctx, searchParams] = await Promise.all([
-    getAppContext(supabase),
-    searchParamsPromise,
-  ]);
-  if (!ctx) redirect("/auth/login");
+import { useMemo } from "react"
+import useSWR from "swr"
+import { useSearchParams, useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { useAppContext } from "@/components/app-context-provider"
+import { useAccessibleAccounts } from "@/lib/hooks/use-accessible-accounts"
+import { usePartnershipCategories } from "@/lib/hooks/use-partnership-categories"
+import { usePartnerProfile } from "@/lib/hooks/use-partner-profile"
+import { TransactionForm } from "@/components/transaction-form"
+import { TransactionsTable, type TransactionRow, type FilterOption } from "@/components/transactions-table"
+import { MobileFab } from "@/components/mobile-fab"
 
-  const { userId, partnershipId, partnerUserId, profile: userProfile } = ctx;
+function pickFirst<T>(val: T | T[]): T {
+  return Array.isArray(val) ? val[0] : val
+}
 
-  const page = Math.max(1, parseInt(searchParams.page as string) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.pageSize as string) || 25));
-  const q = (searchParams.q as string) || "";
-  const sort = (searchParams.sort as string) || "date";
-  const order = (searchParams.order as string) || "desc";
-  const accountFilter = (searchParams.account as string) || "";
-  const categoryFilter = (searchParams.category as string) || "";
-  const payerFilter = (searchParams.payer as string) || "";
+export default function TransactionsPage() {
+  const { userId, partnershipId, partnerUserId, profile: userProfile } = useAppContext()
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
-  const [allAccounts, categories, partnerProfile] = await Promise.all([
-    getAccessibleAccounts(supabase, userId, partnershipId),
-    partnershipId
-      ? getPartnershipCategories(supabase, partnershipId)
-      : Promise.resolve([]),
-    partnerUserId
-      ? getPartnerProfile(supabase, partnerUserId)
-      : Promise.resolve(null),
-  ]);
+  const page = Math.max(1, parseInt(searchParams.get("page") || "") || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "") || 25))
+  const q = searchParams.get("q") || ""
+  const sort = searchParams.get("sort") || "date"
+  const order = searchParams.get("order") || "desc"
+  const accountFilter = searchParams.get("account") || ""
+  const categoryFilter = searchParams.get("category") || ""
+  const payerFilter = searchParams.get("payer") || ""
 
-  const accessibleAccountIds = allAccounts.map((a) => a.id);
+  const { accounts: allAccounts, isLoading: accountsLoading } = useAccessibleAccounts()
+  const { categories, isLoading: categoriesLoading } = usePartnershipCategories()
+  const { profile: partnerProfile, isLoading: profileLoading } = usePartnerProfile()
 
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize - 1;
+  const accessibleAccountIds = useMemo(() => allAccounts.map((a) => a.id), [allAccounts])
 
-  let query = supabase
-    .from("transactions")
-    .select(
-      `id, amount, description, date, type, is_split, user_id,
-       accounts!account_id(id, name, is_shared),
-       categories(id, name, type, icon, color)`,
-      { count: "exact" },
-    )
-    .in("account_id", accessibleAccountIds);
+  const start = (page - 1) * pageSize
+  const end = start + pageSize - 1
 
-  if (q) {
-    const safeQ = q.replace(/[%_]/g, "\\$&");
-    query = query.or(`description.ilike.%${safeQ}%,notes.ilike.%${safeQ}%`);
-  }
+  const sanitizedSort = ["date", "amount", "description"].includes(sort) ? sort : "date"
+  const dir = order === "asc" ? "asc" : "desc"
 
-  if (accountFilter) {
-    query = query.eq("account_id", accountFilter);
-  }
-  if (categoryFilter) {
-    query = query.eq("category_id", categoryFilter);
-  }
-  if (payerFilter) {
-    query = query.eq("user_id", payerFilter);
-  }
+  const txKey = accessibleAccountIds.length > 0
+    ? `transactions-${JSON.stringify({ page, pageSize, q, sort: sanitizedSort, order: dir, accountFilter, categoryFilter, payerFilter })}`
+    : null
 
-  const sanitizedSort = ["date", "amount", "description"].includes(sort) ? sort : "date";
-  const dir = order === "asc" ? "asc" : "desc";
+  const { data: txData, isLoading: txLoading } = useSWR(
+    txKey,
+    async () => {
+      const supabase = createClient()
+      let query = supabase
+        .from("transactions")
+        .select(
+          `id, amount, description, date, type, is_split, user_id,
+           accounts!account_id(id, name, is_shared),
+           categories(id, name, type, icon, color)`,
+          { count: "exact" },
+        )
+        .in("account_id", accessibleAccountIds)
 
-  const { data: transactions, count: totalCount } = await query
-    .order(sanitizedSort, { ascending: dir === "asc" })
-    .range(start, end);
+      if (q) {
+        const safeQ = q.replace(/[%_]/g, "\\$&")
+        query = query.or(`description.ilike.%${safeQ}%,notes.ilike.%${safeQ}%`)
+      }
+      if (accountFilter) query = query.eq("account_id", accountFilter)
+      if (categoryFilter) query = query.eq("category_id", categoryFilter)
+      if (payerFilter) query = query.eq("user_id", payerFilter)
 
-  const userIds = [...new Set((transactions || []).map((t) => t.user_id))];
-  const profileMap = new Map<string, string>();
+      const { data, count } = await query
+        .order(sanitizedSort, { ascending: dir === "asc" })
+        .range(start, end)
 
-  if (userIds.length > 0) {
-    const profiles = await getProfilesByIds(supabase, userIds);
-    for (const p of profiles) {
-      profileMap.set(p.id, p.name || p.id);
-    }
-  }
+      const userIds = [...new Set((data || []).map((t: { user_id: string }) => t.user_id))]
+      let profileMap = new Map<string, string>()
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds)
+        for (const p of profiles || []) {
+          profileMap.set(p.id, p.name || p.id)
+        }
+      }
 
-  function pickFirst<T>(val: T | T[]): T {
-    return Array.isArray(val) ? val[0] : val;
-  }
+      const rows = (data || []).map((t: Record<string, any>) => ({
+        id: t.id as string,
+        amount: t.amount as number,
+        description: t.description as string,
+        date: t.date as string,
+        type: t.type as string,
+        is_split: t.is_split as boolean,
+        user_id: t.user_id as string,
+        payer_name: profileMap.get(t.user_id as string) || "Unknown",
+        accounts: pickFirst(t.accounts) as TransactionRow["accounts"],
+        categories: pickFirst(t.categories) as TransactionRow["categories"],
+      }))
 
-  const rows: TransactionRow[] = (transactions || []).map((t) => ({
-    id: t.id,
-    amount: t.amount,
-    description: t.description,
-    date: t.date,
-    type: t.type,
-    is_split: t.is_split,
-    user_id: t.user_id,
-    payer_name: profileMap.get(t.user_id) || "Unknown",
-    accounts: pickFirst(t.accounts) as TransactionRow["accounts"],
-    categories: pickFirst(t.categories) as TransactionRow["categories"],
-  }));
+      return { rows, totalCount: count || 0 }
+    },
+    { dedupingInterval: 10_000 },
+  )
 
   const filterAccounts: FilterOption[] = allAccounts.map((a) => ({
     id: a.id,
     label: a.name,
-  }));
+  }))
 
-  const filterCategories: FilterOption[] = categories.map((c) => ({
+  const filterCategories: FilterOption[] = categories.map((c: { id: string; name: string }) => ({
     id: c.id,
     label: c.name,
-  }));
+  }))
 
-  const filterPayers: FilterOption[] = [];
+  const filterPayers: FilterOption[] = []
   if (userProfile) {
-    filterPayers.push({ id: userId, label: userProfile.name || userProfile.email || "You" });
+    filterPayers.push({ id: userId, label: userProfile.name || userProfile.email || "You" })
   }
   if (partnerProfile && partnerUserId) {
-    filterPayers.push({ id: partnerUserId, label: partnerProfile.name || partnerProfile.email || "Partner" });
+    filterPayers.push({ id: partnerUserId, label: partnerProfile.name || partnerProfile.email || "Partner" })
+  }
+
+  const isInitialLoading = accountsLoading || (txLoading && !txData)
+
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-5 w-64 bg-muted animate-pulse rounded" />
+          <div className="h-9 w-24 bg-muted animate-pulse rounded" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 bg-muted animate-pulse rounded" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -133,13 +148,13 @@ export default async function TransactionsPage({
           partnershipId={partnershipId}
           partnerUserId={partnerUserId}
           userProfile={userProfile}
-          partnerProfile={partnerProfile}
+          partnerProfile={partnerProfile ?? null}
         />
       </div>
 
       <TransactionsTable
-        data={rows}
-        totalCount={totalCount || 0}
+        data={txData?.rows || []}
+        totalCount={txData?.totalCount || 0}
         page={page}
         pageSize={pageSize}
         search={q}
@@ -156,8 +171,8 @@ export default async function TransactionsPage({
         partnershipId={partnershipId}
         partnerUserId={partnerUserId}
         userProfile={userProfile}
-        partnerProfile={partnerProfile}
+        partnerProfile={partnerProfile ?? null}
       />
     </div>
-  );
+  )
 }

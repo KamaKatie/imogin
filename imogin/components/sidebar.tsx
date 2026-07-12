@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { usePrefetch } from "@/lib/hooks/use-prefetch";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -241,6 +242,14 @@ export function Sidebar({ profile, accounts }: SidebarProps) {
   const supabase = createClient();
   const { theme, setTheme } = useTheme();
   const [planningOpen, setPlanningOpen] = useState(true);
+  const {
+    prefetchAccounts,
+    prefetchCategories,
+    prefetchPartnerProfile,
+    prefetchGoals,
+    prefetchBills,
+    prefetchBudgets,
+  } = usePrefetch();
 
   const fullName = profile.name;
   const avatarUrl = profile.avatarUrl;
@@ -270,10 +279,15 @@ export function Sidebar({ profile, accounts }: SidebarProps) {
           {navItems.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
+            const prefetchMap: Record<string, () => void> = {
+              "/": prefetchAccounts,
+              "/transactions": prefetchAccounts,
+            };
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onMouseEnter={prefetchMap[item.href]}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                   isActive
@@ -289,6 +303,7 @@ export function Sidebar({ profile, accounts }: SidebarProps) {
 
           <Link
             href="/accounts"
+            onMouseEnter={prefetchAccounts}
             className={cn(
               "pt-3 pb-1.5 px-3 flex items-center gap-3 text-sm font-medium transition-colors",
               pathname === "/accounts"
@@ -350,10 +365,17 @@ export function Sidebar({ profile, accounts }: SidebarProps) {
               {planningItems.map((item) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(item.href + "/");
+                const prefetchMap: Record<string, () => void> = {
+                  "/bills": () => { prefetchBills(); prefetchCategories(); prefetchPartnerProfile(); },
+                  "/goals": prefetchGoals,
+                  "/budgets": () => { prefetchBudgets(); prefetchCategories(); },
+                  "/categories": prefetchCategories,
+                };
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    onMouseEnter={prefetchMap[item.href]}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       isActive

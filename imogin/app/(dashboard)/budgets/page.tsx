@@ -1,41 +1,32 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
 import { BudgetForm } from "@/components/budget-form"
-import { getAppContext } from "@/lib/app-context"
-import { getPartnershipCategories } from "@/lib/queries/categories"
-import { getBudgetsWithCategories, getBudgetSpending } from "@/lib/queries/budgets"
+import { useAppContext } from "@/components/app-context-provider"
+import { usePartnershipCategories } from "@/lib/hooks/use-partnership-categories"
+import { useBudgetsWithSpending } from "@/lib/hooks/use-budgets-with-spending"
 
-export default async function BudgetsPage() {
-  const supabase = await createClient()
-  const ctx = await getAppContext(supabase)
-  if (!ctx) redirect("/auth/login")
+export default function BudgetsPage() {
+  const { partnershipId } = useAppContext()
+  const { categories, isLoading: catLoading } = usePartnershipCategories()
+  const { budgetsWithSpending, isLoading: budgetsLoading } = useBudgetsWithSpending()
 
-  const { userId, partnershipId } = ctx
-
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
-
-  const [categories, budgets] = await Promise.all([
-    getPartnershipCategories(supabase, partnershipId),
-    getBudgetsWithCategories(supabase, userId, partnershipId),
-  ])
-
-  const categoryIds = (budgets || []).map(b => b.category_id).filter(Boolean)
-  const txns = await getBudgetSpending(supabase, categoryIds, firstOfMonth, lastOfMonth)
-
-  const budgetsWithSpending = (budgets || []).map((budget) => {
-    let spent = 0
-    for (const t of txns || []) {
-      if (t.category_id !== budget.category_id) continue
-      if (budget.user_id && t.user_id !== userId) continue
-      spent += Math.abs(t.amount)
-    }
-    return { ...budget, spent }
-  })
+  const isLoading = catLoading || budgetsLoading
 
   const totalBudgeted = budgetsWithSpending.reduce((sum, b) => sum + b.amount, 0)
   const totalSpent = budgetsWithSpending.reduce((sum, b) => sum + b.spent, 0)
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <p className="text-muted-foreground">Track spending limits</p>
+        </div>
+        <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

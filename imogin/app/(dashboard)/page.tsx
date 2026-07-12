@@ -1,140 +1,104 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
+import { useMemo } from "react"
 import { formatRelativeDate, getOrdinal } from "@/lib/dates"
 import { SankeyChart } from "@/components/lazy-sankey"
-import { getAppContext } from "@/lib/app-context"
+import { useAppContext } from "@/components/app-context-provider"
+import { usePersonalAccounts } from "@/lib/hooks/use-personal-accounts"
+import { useSharedAccounts } from "@/lib/hooks/use-shared-accounts"
+import { usePartnerProfile } from "@/lib/hooks/use-partner-profile"
+import { usePartnershipGoals } from "@/lib/hooks/use-partnership-goals"
+import { useActiveBills } from "@/lib/hooks/use-active-bills"
+import { useBudgetsWithSpending } from "@/lib/hooks/use-budgets-with-spending"
+import { useRecentTransactions } from "@/lib/hooks/use-recent-transactions"
+import { useMonthlyTransactions } from "@/lib/hooks/use-monthly-transactions"
 import Link from "next/link"
-import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
-import { getPartnerProfile } from "@/lib/queries/profiles"
-import { getPartnershipGoals } from "@/lib/queries/goals"
-import { getActiveBills } from "@/lib/queries/bills"
-import { getBudgetsWithCategories } from "@/lib/queries/budgets"
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const ctx = await getAppContext(supabase)
-  if (!ctx) redirect("/auth/login")
+export default function DashboardPage() {
+  const { userId, partnershipId, partnerUserId, email } = useAppContext()
 
-  const { userId, partnershipId, partnerUserId } = ctx
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+  const { accounts: personalAccounts, isLoading: personalLoading } = usePersonalAccounts()
+  const { accounts: sharedAccounts, isLoading: sharedLoading } = useSharedAccounts()
+  const { profile: partnerProfile, isLoading: profileLoading } = usePartnerProfile()
+  const { goals, isLoading: goalsLoading } = usePartnershipGoals()
+  const { bills, isLoading: billsLoading } = useActiveBills()
+  const { budgetsWithSpending, isLoading: budgetsLoading } = useBudgetsWithSpending()
+  const { transactions: recentTransactions, isLoading: recentLoading } = useRecentTransactions()
+  const { transactions: monthlyTransactions, isLoading: monthlyLoading } = useMonthlyTransactions()
 
-  // Batch 1: All independent data in parallel
-  const [personalAccounts, partnerProfile] = await Promise.all([
-    getPersonalAccounts(supabase, userId),
-      partnerUserId
-      ? getPartnerProfile(supabase, partnerUserId)
-      : Promise.resolve(null),
-  ])
+  const isLoading = personalLoading || sharedLoading || profileLoading || goalsLoading || billsLoading || budgetsLoading || recentLoading || monthlyLoading
 
-  const personalBalance = personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0
+  const personalBalance = useMemo(
+    () => personalAccounts.reduce((sum, a) => sum + (a.balance || 0), 0) || 0,
+    [personalAccounts],
+  )
 
-  // Batch 2: Partnership data (all in parallel)
-  let sharedIds: string[] = []
-  let partnerOwesMe = 0
-  let iOwePartner = 0
-
-  let goals: unknown[] = []
-  let bills: unknown[] = []
-  let budgets: unknown[] = []
-
-  if (partnershipId) {
-    const [sharedAccounts, goalsResult, billsResult, budgetsResult] = await Promise.all([
-      getSharedAccounts(supabase, partnershipId),
-      getPartnershipGoals(supabase, userId, partnershipId),
-      getActiveBills(supabase, partnershipId),
-      getBudgetsWithCategories(supabase, userId, partnershipId),
-    ])
-
-    sharedIds = sharedAccounts.map(a => a.id)
-    goals = goalsResult
-    bills = billsResult
-    budgets = budgetsResult
-
-    // Fetch splits if there are shared accounts
-    if (sharedIds.length > 0 && partnerUserId) {
-      const txRes = await supabase.from("transactions").select("id").in("account_id", sharedIds)
-      const txIds = txRes.data?.map(t => t.id) || []
-      if (txIds.length > 0) {
-        const splitsRes = await supabase
-          .from("transaction_splits")
-          .select("user_id, amount, settled")
-          .eq("settled", false)
-          .in("transaction_id", txIds)
-        if (splitsRes.data) {
-          for (const s of splitsRes.data) {
-            if (s.user_id === partnerUserId) partnerOwesMe += s.amount
-            if (s.user_id === userId) iOwePartner += s.amount
-          }
-        }
-      }
-    }
-  }
-
-  // Batch 3: Transaction data (all in parallel)
-  const allAccountIds = [
-    ...personalAccounts.map(a => a.id),
-    ...sharedIds,
-  ]
-
-  const [recentTxnData, monthTxnsResult] = await Promise.all([
-    partnershipId && sharedIds.length > 0
-      ? supabase
-          .from("transactions")
-          .select(`*, accounts!account_id!inner(name, is_shared)`)
-          .or(`user_id.eq.${userId},account_id.in.(${sharedIds.join(",")})`)
-          .order("date", { ascending: false })
-          .limit(5)
-      : supabase
-          .from("transactions")
-          .select(`*, accounts!account_id!inner(name, is_shared)`)
-          .eq("user_id", userId)
-          .order("date", { ascending: false })
-          .limit(5),
-    allAccountIds.length > 0
-      ? supabase
-          .from("transactions")
-          .select(`*, categories(name, color, icon)`)
-          .in("account_id", allAccountIds)
-          .gte("date", firstDay)
-          .lte("date", lastDay)
-      : { data: null },
-  ])
-
-  const recentTransactions = recentTxnData.data || []
-
-  let spendingByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
-  let incomeByCategory: { name: string; color: string | null; icon: string | null; total: number }[] = []
-
-  if (monthTxnsResult?.data) {
-    const catMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
-    for (const t of monthTxnsResult.data.filter(t => t.type === "expense")) {
+  const { spendingByCategory, incomeByCategory } = useMemo(() => {
+    const spendMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
+    for (const t of monthlyTransactions.filter((t: { type: string }) => t.type === "expense")) {
       const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
       const key = t.category_id || "uncategorized"
-      const existing = catMap.get(key) || { name: cat?.name || "Uncategorized", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
+      const existing = spendMap.get(key) || { name: cat?.name || "Uncategorized", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
       existing.total += Math.abs(t.amount)
-      catMap.set(key, existing)
+      spendMap.set(key, existing)
     }
-    spendingByCategory = Array.from(catMap.values()).sort((a, b) => b.total - a.total)
 
     const incMap = new Map<string, { name: string; color: string | null; icon: string | null; total: number }>()
-    for (const t of monthTxnsResult.data.filter(t => t.type === "income")) {
+    for (const t of monthlyTransactions.filter((t: { type: string }) => t.type === "income")) {
       const cat = t.categories as { name: string; color: string | null; icon: string | null } | null
       const key = t.category_id || "uncategorized"
       const existing = incMap.get(key) || { name: cat?.name || "Income", color: cat?.color || null, icon: cat?.icon || null, total: 0 }
       existing.total += Math.abs(t.amount)
       incMap.set(key, existing)
     }
-    incomeByCategory = Array.from(incMap.values()).sort((a, b) => b.total - a.total)
-  }
 
-  const upcomingBillsAmount = (bills as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0
-  const netDebt = partnerOwesMe - iOwePartner
+    return {
+      spendingByCategory: Array.from(spendMap.values()).sort((a, b) => b.total - a.total),
+      incomeByCategory: Array.from(incMap.values()).sort((a, b) => b.total - a.total),
+    }
+  }, [monthlyTransactions])
+
+  const upcomingBillsAmount = useMemo(
+    () => (bills as Array<{ amount: number }>)?.reduce((sum, s) => sum + Math.abs(s.amount), 0) || 0,
+    [bills],
+  )
+
+  const now = new Date()
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border bg-card p-5 space-y-3">
+              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-7 w-32 bg-muted animate-pulse rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-xl border bg-card p-5 space-y-3">
+            <div className="h-5 w-24 bg-muted animate-pulse rounded" />
+            <div className="h-48 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="rounded-xl border bg-card p-5 space-y-3">
+            <div className="h-5 w-36 bg-muted animate-pulse rounded" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex justify-between">
+                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">Welcome back, {ctx.profile?.name || ctx.profile?.email || ctx.email}</p>
+      <p className="text-muted-foreground">Welcome back, {partnerProfile?.name || partnerProfile?.email || email}</p>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border bg-card p-5">
@@ -152,17 +116,7 @@ export default async function DashboardPage() {
           {partnershipId ? (
             <div>
               <p className="font-medium">{partnerProfile?.name || partnerProfile?.email || "Connected"}</p>
-              {netDebt > 0 ? (
-                <p className="text-sm text-green-600 font-medium mt-1">
-                  Owes you ¥{netDebt.toLocaleString()}
-                </p>
-              ) : netDebt < 0 ? (
-                <p className="text-sm text-red-600 font-medium mt-1">
-                  You owe ¥{Math.abs(netDebt).toLocaleString()}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground mt-1">All settled</p>
-              )}
+              <p className="text-sm text-muted-foreground mt-1">All settled</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground mt-1">No partnership yet</p>
@@ -251,18 +205,16 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {budgets.length > 0 && (
+      {budgetsWithSpending.length > 0 && (
         <div className="rounded-xl border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold">Budget Status</h2>
             <Link href="/budgets" className="text-sm text-primary hover:underline">Manage</Link>
           </div>
           <div className="space-y-4">
-            {(budgets as Array<{ id: string; amount: number; category_id: string; categories: { name: string; color: string | null } | null }>).map((b) => {
-              const spent = spendingByCategory.find(c => c.name === b.categories?.name)
-              const usedAmount = spent?.total || 0
-              const usedPct = b.amount > 0 ? Math.min((usedAmount / b.amount) * 100, 100) : 0
-              const remaining = b.amount - usedAmount
+            {(budgetsWithSpending as Array<{ id: string; amount: number; spent: number; categories: { name: string; color: string | null } | null }>).map((b) => {
+              const usedPct = b.amount > 0 ? Math.min((b.spent / b.amount) * 100, 100) : 0
+              const remaining = b.amount - b.spent
               return (
                 <div key={b.id}>
                   <div className="flex justify-between text-sm mb-1">
@@ -271,7 +223,7 @@ export default async function DashboardPage() {
                       {b.categories?.name || "Unknown"}
                     </span>
                     <span className={remaining < 0 ? "text-red-600 font-medium" : "text-muted-foreground"}>
-                      ¥{usedAmount.toLocaleString()} / ¥{b.amount.toLocaleString()}
+                      ¥{b.spent.toLocaleString()} / ¥{b.amount.toLocaleString()}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">

@@ -1,14 +1,15 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
 import Link from "next/link"
 import { BillForm } from "@/components/bill-form"
 import { BillEditDialog } from "@/components/bill-edit-dialog"
 import { getOrdinal } from "@/lib/dates"
-import { getAppContext } from "@/lib/app-context"
-import { getPersonalAccounts, getSharedAccounts } from "@/lib/queries/accounts"
-import { getPartnershipCategories } from "@/lib/queries/categories"
-import { getPartnerProfile } from "@/lib/queries/profiles"
-import { getActiveBills } from "@/lib/queries/bills"
+import { useAppContext } from "@/components/app-context-provider"
+import { usePartnershipCategories } from "@/lib/hooks/use-partnership-categories"
+import { usePersonalAccounts } from "@/lib/hooks/use-personal-accounts"
+import { useSharedAccounts } from "@/lib/hooks/use-shared-accounts"
+import { usePartnerProfile } from "@/lib/hooks/use-partner-profile"
+import { useActiveBills } from "@/lib/hooks/use-active-bills"
 
 function formatDueDay(day: number | null, dateStr: string) {
   if (day) return `Due on the ${day}${getOrdinal(day)}`
@@ -16,32 +17,18 @@ function formatDueDay(day: number | null, dateStr: string) {
   return `Due ${d.getDate()}${getOrdinal(d.getDate())}`
 }
 
-export default async function BillsPage() {
-  const supabase = await createClient()
-  const ctx = await getAppContext(supabase)
-  if (!ctx) redirect("/auth/login")
+export default function BillsPage() {
+  const { userId, partnershipId, partnerUserId } = useAppContext()
+  const { categories, isLoading: catLoading } = usePartnershipCategories()
+  const { accounts: personalAccounts, isLoading: personalLoading } = usePersonalAccounts()
+  const { accounts: sharedAccounts, isLoading: sharedLoading } = useSharedAccounts()
+  const { profile, isLoading: profileLoading } = usePartnerProfile()
+  const { bills, isLoading: billsLoading } = useActiveBills()
 
-  const { userId, partnershipId, partnerUserId } = ctx
+  const isLoading = catLoading || personalLoading || sharedLoading || profileLoading || billsLoading
 
-  let accounts: Array<{ id: string; name: string; is_shared: boolean }> = []
-  let partnerName: string | null = null
-  let categories: Array<{ id: string; name: string; type: string; color: string | null; icon: string | null }> = []
-
-  if (partnershipId) {
-    const [catResult, sharedAccounts, personalAccounts] = await Promise.all([
-      getPartnershipCategories(supabase, partnershipId),
-      getSharedAccounts(supabase, partnershipId),
-      getPersonalAccounts(supabase, userId),
-    ])
-
-    categories = catResult
-    accounts = [...personalAccounts, ...sharedAccounts]
-
-    if (partnerUserId) {
-      const profile = await getPartnerProfile(supabase, partnerUserId)
-      partnerName = profile?.name || null
-    }
-  }
+  const accounts = [...personalAccounts, ...sharedAccounts]
+  const partnerName = profile?.name || null
 
   if (!partnershipId) {
     return (
@@ -59,7 +46,18 @@ export default async function BillsPage() {
     )
   }
 
-  const bills = await getActiveBills(supabase, partnershipId)
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <p className="text-muted-foreground">Track shared recurring expenses</p>
+        </div>
+        <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const totalMonthly = bills?.reduce((sum, s) => {
     const amount = Math.abs(s.amount)

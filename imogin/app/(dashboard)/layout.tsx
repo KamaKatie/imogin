@@ -31,18 +31,18 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen">
-      <Sidebar profile={sidebarProfile} accounts={accounts || []} />
-      <div className="flex flex-col flex-1 lg:ml-64">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-20 lg:pb-6">
-          <PageInfoProvider>
-            <AppContextProvider data={ctx}>
+    <AppContextProvider data={ctx}>
+      <div className="flex h-screen">
+        <Sidebar profile={sidebarProfile} accounts={accounts || []} />
+        <div className="flex flex-col flex-1 lg:ml-64">
+          <TopBar />
+          <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-20 lg:pb-6">
+            <PageInfoProvider>
               {children}
-            </AppContextProvider>
-          </PageInfoProvider>
-        </main>
+            </PageInfoProvider>
+          </main>
+        </div>
       </div>
-    </div>
+    </AppContextProvider>
   )
 }
